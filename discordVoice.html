@@ -3,32 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مسجل صوت للديسكورد</title>
+    <title>مغير أصوات ديسكورد</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
         body {
             font-family: 'Cairo', sans-serif;
-            background-color: #313338; /* Discord Dark Background */
+            background-color: #313338;
         }
-        .discord-btn {
-            transition: all 0.2s;
-        }
-        .discord-btn:active {
-            transform: scale(0.95);
-        }
-        .pulse {
-            animation: pulse-animation 1.5s infinite;
-        }
+        .discord-btn { transition: all 0.2s; }
+        .discord-btn:active { transform: scale(0.95); }
+        .pulse { animation: pulse-animation 1.5s infinite; }
         @keyframes pulse-animation {
             0% { box-shadow: 0 0 0 0 rgba(235, 69, 158, 0.4); }
             70% { box-shadow: 0 0 0 15px rgba(235, 69, 158, 0); }
             100% { box-shadow: 0 0 0 0 rgba(235, 69, 158, 0); }
         }
-        canvas {
-            width: 100%;
-            height: 60px;
+        
+        /* Custom Select Styling */
+        .custom-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b5bac1%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: left 1rem center;
+            background-size: 0.65em auto;
         }
     </style>
 </head>
@@ -39,9 +38,27 @@
         <!-- Header -->
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-100 mb-2 flex items-center justify-center gap-2">
-                <i class="fab fa-discord text-[#5865F2]"></i> مسجل ديسكورد
+                <i class="fab fa-discord text-[#5865F2]"></i> مغير الأصوات
             </h1>
-            <p class="text-gray-400 text-sm">سجل صوتك وحمله كملف WAV جاهز للتشغيل</p>
+            <p class="text-gray-400 text-sm">سجل، غيّر صوتك، وحمله للديسكورد</p>
+        </div>
+
+        <!-- Effect Selector -->
+        <div class="mb-6 relative">
+            <label class="block text-right text-xs text-gray-400 mb-2 font-bold px-1">اختر التأثير الصوتي:</label>
+            <div class="relative">
+                <select id="effectSelect" class="custom-select w-full bg-[#1e1f22] text-gray-200 p-3 pr-4 pl-10 rounded-lg outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors cursor-pointer text-sm font-semibold">
+                    <option value="none">🎤 صوت طبيعي (بدون تغيير)</option>
+                    <option value="woman">👩 صوت نسائي (نغمة عالية)</option>
+                    <option value="man">👨 صوت رجالي (نغمة عميقة)</option>
+                    <option value="chipmunk">🐿️ سنجاب (سريع جداً)</option>
+                    <option value="monster">👹 وحش (بطيء ومرعب)</option>
+                    <option value="robot">🤖 روبوت (معدني)</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-[#5865F2]">
+                    <i class="fas fa-magic"></i>
+                </div>
+            </div>
         </div>
 
         <!-- Timer -->
@@ -49,36 +66,39 @@
             00:00
         </div>
 
-        <!-- Visualizer Canvas -->
-        <div class="h-16 w-full bg-[#1e1f22] rounded-lg mb-8 overflow-hidden relative flex items-center justify-center">
+        <!-- Visualizer -->
+        <div class="h-16 w-full bg-[#1e1f22] rounded-lg mb-8 overflow-hidden relative flex items-center justify-center border border-[#111214]">
             <canvas id="visualizer"></canvas>
             <span id="placeholder-wave" class="text-gray-600 text-xs absolute">الموجات الصوتية ستظهر هنا</span>
         </div>
 
         <!-- Controls -->
         <div class="flex justify-center items-center gap-4">
-            <!-- Record Button -->
             <button id="recordBtn" class="discord-btn w-20 h-20 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-2xl shadow-lg flex items-center justify-center focus:outline-none">
                 <i class="fas fa-microphone"></i>
             </button>
 
-            <!-- Stop Button (Hidden initially) -->
             <button id="stopBtn" class="hidden discord-btn w-20 h-20 rounded-full bg-[#ED4245] hover:bg-[#c03537] text-white text-2xl shadow-lg flex items-center justify-center focus:outline-none pulse">
                 <i class="fas fa-stop"></i>
             </button>
         </div>
 
-        <!-- Status Text -->
         <p id="statusText" class="mt-6 text-gray-400 text-sm font-semibold">جاهز للتسجيل</p>
+
+        <!-- Processing Indicator (Hidden) -->
+        <div id="processingLoader" class="hidden mt-4">
+            <i class="fas fa-circle-notch fa-spin text-[#5865F2] text-xl"></i>
+            <span class="text-xs text-gray-400 block mt-1">جاري معالجة الصوت...</span>
+        </div>
 
     </div>
 
     <script>
         let audioContext;
         let mediaStream;
-        let recorder; // ScriptProcessorNode
-        let input; // MediaStreamAudioSourceNode
-        let audioChunks = []; // To store raw PCM data
+        let recorder;
+        let input;
+        let audioChunks = [];
         let startTime;
         let timerInterval;
         let analyser;
@@ -92,8 +112,9 @@
         const timerDisplay = document.getElementById('timer');
         const canvas = document.getElementById('visualizer');
         const placeholderWave = document.getElementById('placeholder-wave');
+        const effectSelect = document.getElementById('effectSelect');
+        const processingLoader = document.getElementById('processingLoader');
 
-        // Setup Canvas
         function setupCanvas() {
             const dpr = window.devicePixelRatio || 1;
             const rect = canvas.getBoundingClientRect();
@@ -142,7 +163,6 @@
         async function startRecording() {
             try {
                 mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 64;
@@ -150,18 +170,14 @@
                 input = audioContext.createMediaStreamSource(mediaStream);
                 input.connect(analyser);
 
-                // Create ScriptProcessor to capture raw audio
                 recorder = audioContext.createScriptProcessor(bufferSize, 1, 1);
-                
-                audioChunks = []; // Reset chunks
+                audioChunks = [];
                 
                 recorder.onaudioprocess = (e) => {
                     const channelData = e.inputBuffer.getChannelData(0);
-                    // Clone the data because the buffer is reused
                     audioChunks.push(new Float32Array(channelData));
                 };
 
-                // Connect the graph
                 input.connect(recorder);
                 recorder.connect(audioContext.destination);
 
@@ -173,9 +189,10 @@
                 
                 recordBtn.classList.add('hidden');
                 stopBtn.classList.remove('hidden');
-                statusText.textContent = "جاري التسجيل (WAV)...";
+                statusText.textContent = "جاري التسجيل...";
                 statusText.className = "mt-6 text-[#ED4245] text-sm font-semibold animate-pulse";
                 placeholderWave.style.display = 'none';
+                effectSelect.disabled = true; // Disable change while recording
 
             } catch (err) {
                 console.error("Error:", err);
@@ -183,8 +200,7 @@
             }
         }
 
-        function stopRecording() {
-            // Disconnect nodes
+        async function stopRecording() {
             if (recorder && input) {
                 recorder.disconnect();
                 input.disconnect();
@@ -195,67 +211,148 @@
             clearInterval(timerInterval);
             cancelAnimationFrame(animationId);
             
-            // Process Audio Data
-            exportWAV(audioChunks);
-
-            // Reset UI
-            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-            placeholderWave.style.display = 'block';
+            // UI Updates
             stopBtn.classList.add('hidden');
-            recordBtn.classList.remove('hidden');
-            statusText.textContent = "تم التحميل! اسحبه للديسكورد";
-            statusText.className = "mt-6 text-[#23a559] text-sm font-semibold";
-            timerDisplay.textContent = "00:00";
+            processingLoader.classList.remove('hidden');
+            statusText.textContent = "جاري معالجة التأثيرات...";
+            
+            // Wait a moment for UI to update
+            setTimeout(async () => {
+                const selectedEffect = effectSelect.value;
+                const processedBuffer = await applyEffect(audioChunks, selectedEffect);
+                
+                exportWAV(processedBuffer);
+
+                // Reset UI
+                canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+                placeholderWave.style.display = 'block';
+                recordBtn.classList.remove('hidden');
+                processingLoader.classList.add('hidden');
+                effectSelect.disabled = false;
+                statusText.textContent = "تم التحميل! اسحبه للديسكورد";
+                statusText.className = "mt-6 text-[#23a559] text-sm font-semibold";
+                timerDisplay.textContent = "00:00";
+            }, 100);
         }
 
-        // --- WAV Encoding Functions ---
-        function exportWAV(chunks) {
-            // Flatten the array of Float32Arrays
+        // --- Audio Effect Processing ---
+        async function applyEffect(chunks, effect) {
+            // 1. Convert raw chunks to a single AudioBuffer
             const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-            const result = new Float32Array(totalLength);
+            const rawBuffer = audioContext.createBuffer(1, totalLength, audioContext.sampleRate);
+            const channelData = rawBuffer.getChannelData(0);
             let offset = 0;
             for (const chunk of chunks) {
-                result.set(chunk, offset);
+                channelData.set(chunk, offset);
                 offset += chunk.length;
             }
 
-            // Encode to WAV
-            const buffer = new ArrayBuffer(44 + result.length * 2);
+            if (effect === 'none') return channelData;
+
+            // 2. Setup Offline Context for rendering effects
+            // Determine new duration (pitch shifting usually changes speed)
+            let speedRate = 1.0;
+            if (effect === 'woman') speedRate = 1.15; // Faster/Higher
+            if (effect === 'man') speedRate = 0.85;   // Slower/Deeper
+            if (effect === 'chipmunk') speedRate = 1.5; 
+            if (effect === 'monster') speedRate = 0.65;
+            
+            const newLength = Math.ceil(totalLength / speedRate);
+            const offlineCtx = new OfflineAudioContext(1, newLength, audioContext.sampleRate);
+            
+            const source = offlineCtx.createBufferSource();
+            source.buffer = rawBuffer;
+
+            // Apply Effects
+            if (effect === 'robot') {
+                // Ring Modulation Effect
+                const oscillator = offlineCtx.createOscillator();
+                oscillator.frequency.value = 50; // Metal frequency
+                oscillator.type = 'sawtooth';
+                
+                const gainOsc = offlineCtx.createGain();
+                gainOsc.gain.value = 1000;
+
+                const gainNode = offlineCtx.createGain();
+                gainNode.gain.value = 0.5;
+
+                // Modulate gain
+                oscillator.connect(gainNode.gain);
+                source.connect(gainNode);
+                gainNode.connect(offlineCtx.destination);
+                oscillator.start();
+            } else {
+                // Pitch/Speed shifting
+                source.playbackRate.value = speedRate;
+                
+                if (effect === 'monster') {
+                    // Add distortion
+                    const waveShaper = offlineCtx.createWaveShaper();
+                    waveShaper.curve = makeDistortionCurve(400);
+                    source.connect(waveShaper);
+                    waveShaper.connect(offlineCtx.destination);
+                } else {
+                    source.connect(offlineCtx.destination);
+                }
+            }
+
+            source.start();
+            
+            // Render
+            const renderedBuffer = await offlineCtx.startRendering();
+            return renderedBuffer.getChannelData(0);
+        }
+
+        function makeDistortionCurve(amount) {
+            const k = typeof amount === 'number' ? amount : 50;
+            const n_samples = 44100;
+            const curve = new Float32Array(n_samples);
+            const deg = Math.PI / 180;
+            for (let i = 0; i < n_samples; ++i) {
+                const x = (i * 2) / n_samples - 1;
+                curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+            }
+            return curve;
+        }
+
+        // --- WAV Encoding ---
+        function exportWAV(data) {
+            const buffer = new ArrayBuffer(44 + data.length * 2);
             const view = new DataView(buffer);
 
-            // RIFF chunk descriptor
+            // RIFF chunk
             writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + result.length * 2, true);
+            view.setUint32(4, 36 + data.length * 2, true);
             writeString(view, 8, 'WAVE');
             
-            // fmt sub-chunk
+            // fmt chunk
             writeString(view, 12, 'fmt ');
             view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM format
-            view.setUint16(22, 1, true); // Mono
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, 1, true); 
             view.setUint32(24, audioContext.sampleRate, true);
             view.setUint32(28, audioContext.sampleRate * 2, true);
             view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true); // 16-bit
+            view.setUint16(34, 16, true); 
 
-            // data sub-chunk
+            // data chunk
             writeString(view, 36, 'data');
-            view.setUint32(40, result.length * 2, true);
+            view.setUint32(40, data.length * 2, true);
 
-            // Write PCM samples
-            floatTo16BitPCM(view, 44, result);
+            floatTo16BitPCM(view, 44, data);
 
             const blob = new Blob([view], { type: 'audio/wav' });
             const url = URL.createObjectURL(blob);
             
-            // Generate filename
+            // Filename based on effect
+            const effectName = effectSelect.value !== 'none' ? `-${effectSelect.value}` : '';
             const date = new Date();
-            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+            const timestamp = `${date.getHours()}-${date.getMinutes()}`;
             
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `voice-message-${timestamp}.wav`;
+            a.download = `voice${effectName}-${timestamp}.wav`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
