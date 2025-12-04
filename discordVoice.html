@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مسجل صوت للديسكورد</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #313338; /* Discord Dark Background */
+        }
+        .discord-btn {
+            transition: all 0.2s;
+        }
+        .discord-btn:active {
+            transform: scale(0.95);
+        }
+        .pulse {
+            animation: pulse-animation 1.5s infinite;
+        }
+        @keyframes pulse-animation {
+            0% { box-shadow: 0 0 0 0 rgba(235, 69, 158, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(235, 69, 158, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(235, 69, 158, 0); }
+        }
+        canvas {
+            width: 100%;
+            height: 60px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen text-gray-100 selection:bg-indigo-500 selection:text-white">
+
+    <div class="w-full max-w-md bg-[#2b2d31] rounded-xl shadow-2xl overflow-hidden border border-[#1e1f22] p-6 text-center">
+        
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-100 mb-2 flex items-center justify-center gap-2">
+                <i class="fab fa-discord text-[#5865F2]"></i> مسجل ديسكورد
+            </h1>
+            <p class="text-gray-400 text-sm">سجل صوتك وحمله كملف WAV جاهز للتشغيل</p>
+        </div>
+
+        <!-- Timer -->
+        <div id="timer" class="text-4xl font-mono font-bold text-gray-200 mb-8 tracking-wider">
+            00:00
+        </div>
+
+        <!-- Visualizer Canvas -->
+        <div class="h-16 w-full bg-[#1e1f22] rounded-lg mb-8 overflow-hidden relative flex items-center justify-center">
+            <canvas id="visualizer"></canvas>
+            <span id="placeholder-wave" class="text-gray-600 text-xs absolute">الموجات الصوتية ستظهر هنا</span>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-center items-center gap-4">
+            <!-- Record Button -->
+            <button id="recordBtn" class="discord-btn w-20 h-20 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-2xl shadow-lg flex items-center justify-center focus:outline-none">
+                <i class="fas fa-microphone"></i>
+            </button>
+
+            <!-- Stop Button (Hidden initially) -->
+            <button id="stopBtn" class="hidden discord-btn w-20 h-20 rounded-full bg-[#ED4245] hover:bg-[#c03537] text-white text-2xl shadow-lg flex items-center justify-center focus:outline-none pulse">
+                <i class="fas fa-stop"></i>
+            </button>
+        </div>
+
+        <!-- Status Text -->
+        <p id="statusText" class="mt-6 text-gray-400 text-sm font-semibold">جاهز للتسجيل</p>
+
+    </div>
+
+    <script>
+        let audioContext;
+        let mediaStream;
+        let recorder; // ScriptProcessorNode
+        let input; // MediaStreamAudioSourceNode
+        let audioChunks = []; // To store raw PCM data
+        let startTime;
+        let timerInterval;
+        let analyser;
+        let canvasContext;
+        let animationId;
+        const bufferSize = 4096;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusText = document.getElementById('statusText');
+        const timerDisplay = document.getElementById('timer');
+        const canvas = document.getElementById('visualizer');
+        const placeholderWave = document.getElementById('placeholder-wave');
+
+        // Setup Canvas
+        function setupCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvasContext = canvas.getContext('2d');
+            canvasContext.scale(dpr, dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+        }
+        window.addEventListener('resize', setupCanvas);
+
+        function updateTimer() {
+            const now = Date.now();
+            const diff = now - startTime;
+            const seconds = Math.floor((diff / 1000) % 60);
+            const minutes = Math.floor((diff / (1000 * 60)) % 60);
+            timerDisplay.textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function drawVisualizer() {
+            const WIDTH = canvas.width / (window.devicePixelRatio || 1);
+            const HEIGHT = canvas.height / (window.devicePixelRatio || 1);
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            canvasContext.fillStyle = '#1e1f22';
+            canvasContext.fillRect(0, 0, WIDTH, HEIGHT);
+
+            const barWidth = (WIDTH / bufferLength) * 2.5;
+            let barHeight;
+            let x = 0;
+
+            for(let i = 0; i < bufferLength; i++) {
+                barHeight = dataArray[i] / 2;
+                canvasContext.fillStyle = `rgb(${50 + barHeight}, ${101 + (barHeight/2)}, ${242})`;
+                const y = (HEIGHT - barHeight) / 2;
+                canvasContext.fillRect(x, y, barWidth, barHeight);
+                x += barWidth + 1;
+            }
+            animationId = requestAnimationFrame(drawVisualizer);
+        }
+
+        async function startRecording() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 64;
+                
+                input = audioContext.createMediaStreamSource(mediaStream);
+                input.connect(analyser);
+
+                // Create ScriptProcessor to capture raw audio
+                recorder = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                
+                audioChunks = []; // Reset chunks
+                
+                recorder.onaudioprocess = (e) => {
+                    const channelData = e.inputBuffer.getChannelData(0);
+                    // Clone the data because the buffer is reused
+                    audioChunks.push(new Float32Array(channelData));
+                };
+
+                // Connect the graph
+                input.connect(recorder);
+                recorder.connect(audioContext.destination);
+
+                setupCanvas();
+                drawVisualizer();
+
+                startTime = Date.now();
+                timerInterval = setInterval(updateTimer, 1000);
+                
+                recordBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                statusText.textContent = "جاري التسجيل (WAV)...";
+                statusText.className = "mt-6 text-[#ED4245] text-sm font-semibold animate-pulse";
+                placeholderWave.style.display = 'none';
+
+            } catch (err) {
+                console.error("Error:", err);
+                alert("يرجى السماح بالوصول إلى الميكروفون.");
+            }
+        }
+
+        function stopRecording() {
+            // Disconnect nodes
+            if (recorder && input) {
+                recorder.disconnect();
+                input.disconnect();
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+            clearInterval(timerInterval);
+            cancelAnimationFrame(animationId);
+            
+            // Process Audio Data
+            exportWAV(audioChunks);
+
+            // Reset UI
+            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+            placeholderWave.style.display = 'block';
+            stopBtn.classList.add('hidden');
+            recordBtn.classList.remove('hidden');
+            statusText.textContent = "تم التحميل! اسحبه للديسكورد";
+            statusText.className = "mt-6 text-[#23a559] text-sm font-semibold";
+            timerDisplay.textContent = "00:00";
+        }
+
+        // --- WAV Encoding Functions ---
+        function exportWAV(chunks) {
+            // Flatten the array of Float32Arrays
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const result = new Float32Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+                result.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            // Encode to WAV
+            const buffer = new ArrayBuffer(44 + result.length * 2);
+            const view = new DataView(buffer);
+
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + result.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            
+            // fmt sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM format
+            view.setUint16(22, 1, true); // Mono
+            view.setUint32(24, audioContext.sampleRate, true);
+            view.setUint32(28, audioContext.sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true); // 16-bit
+
+            // data sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, result.length * 2, true);
+
+            // Write PCM samples
+            floatTo16BitPCM(view, 44, result);
+
+            const blob = new Blob([view], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            
+            // Generate filename
+            const date = new Date();
+            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `voice-message-${timestamp}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        function floatTo16BitPCM(output, offset, input) {
+            for (let i = 0; i < input.length; i++, offset += 2) {
+                const s = Math.max(-1, Math.min(1, input[i]));
+                output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        recordBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+    </script>
+</body>
+</html>
