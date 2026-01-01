@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Hello Kitty Pixel Kiss</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,7 +14,9 @@
     <style>
         body {
             font-family: 'Press Start 2P', cursive;
-            image-rendering: pixelated; /* Ensures things look crisp */
+            image-rendering: pixelated;
+            touch-action: manipulation; /* Prevents double-tap zoom */
+            -webkit-tap-highlight-color: transparent; /* Removes blue tap highlight on mobile */
         }
 
         /* Pixel Art Animations */
@@ -29,7 +31,7 @@
             95% { transform: scaleY(0.1); }
         }
 
-        /* Retro "Hard" Shadows for that 8-bit feel */
+        /* Retro "Hard" Shadows */
         .pixel-box {
             box-shadow: 6px 6px 0px 0px #000000;
         }
@@ -45,7 +47,7 @@
 
         .kitty-eye {
             transform-origin: center;
-            animation: blink 4s infinite steps(1); /* Steps(1) makes animation jerky/retro */
+            animation: blink 4s infinite steps(1);
         }
 
         /* Speech Bubble Tail */
@@ -75,11 +77,18 @@
             user-select: none;
             -webkit-user-select: none;
         }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 640px) {
+            .pixel-box {
+                box-shadow: 4px 4px 0px 0px #000000;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen bg-pink-200 flex items-center justify-center p-4 overflow-hidden relative selection:bg-pink-400 selection:text-white">
 
-    <!-- Background Grid Pattern (CSS generated) -->
+    <!-- Background Grid Pattern -->
     <div class="absolute inset-0 opacity-10 pointer-events-none z-0" 
          style="background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px); background-size: 20px 20px;">
     </div>
@@ -88,12 +97,12 @@
     <div id="background-elements" class="absolute inset-0 pointer-events-none overflow-hidden z-0"></div>
 
     <!-- Main Card -->
-    <div id="main-card" class="bg-white border-4 border-black pixel-box max-w-lg w-full p-6 text-center relative z-10" style="min-height: 550px;">
+    <div id="main-card" class="bg-white border-4 border-black pixel-box max-w-lg w-full p-4 md:p-6 text-center relative z-10 flex flex-col justify-center" style="min-height: 500px;">
         
         <!-- Retro Header Bar -->
-        <div class="bg-pink-500 border-b-4 border-black -mx-6 -mt-6 mb-8 py-2 px-4 flex justify-between items-center">
-            <span class="text-white text-xs">♥ HELLO_KITTY.EXE</span>
-            <div class="flex gap-2">
+        <div class="bg-pink-500 border-b-4 border-black -mx-4 -mt-4 md:-mx-6 md:-mt-6 mb-6 py-3 px-4 flex justify-between items-center">
+            <span class="text-white text-[10px] md:text-xs truncate mr-2">♥ HELLO_KITTY_MOBILE.EXE</span>
+            <div class="flex gap-2 shrink-0">
                 <div class="w-3 h-3 bg-yellow-400 border-2 border-black"></div>
                 <div class="w-3 h-3 bg-green-400 border-2 border-black"></div>
                 <div class="w-3 h-3 bg-red-400 border-2 border-black"></div>
@@ -101,20 +110,19 @@
         </div>
 
         <!-- STATE 1: ASK -->
-        <div id="state-ask" class="flex flex-col items-center justify-between h-full relative transition-opacity duration-300">
+        <div id="state-ask" class="flex flex-col items-center justify-between h-full relative transition-opacity duration-300 flex-1 py-4">
             
             <!-- Speech Bubble (Hidden initially) -->
-            <div id="speech-bubble" class="absolute -top-4 w-full opacity-0 transition-opacity duration-200 z-30 pointer-events-none">
-                <div class="pixel-bubble relative bg-black p-1 mx-auto max-w-[90%]">
-                    <div class="pixel-bubble-inner bg-white p-3 text-[10px] leading-tight text-black font-bold">
+            <div id="speech-bubble" class="absolute -top-6 w-full opacity-0 transition-opacity duration-200 z-30 pointer-events-none">
+                <div class="pixel-bubble relative bg-black p-1 mx-auto max-w-[95%]">
+                    <div class="pixel-bubble-inner bg-white p-3 text-[10px] md:text-xs leading-tight text-black font-bold">
                         "la sm7ili had lkheyar makaynch darori tbrki yes"
                     </div>
                 </div>
             </div>
 
-            <!-- Pixel Hello Kitty SVG -->
-            <!-- Using shape-rendering="crispEdges" to force pixel look on SVG -->
-            <div class="w-48 h-40 relative mb-6 hover:scale-105 transition-transform duration-300">
+            <!-- Pixel Hello Kitty SVG - Responsive Size -->
+            <div class="w-32 h-28 md:w-48 md:h-40 relative mb-4 md:mb-6 hover:scale-105 transition-transform duration-300">
                 <svg viewBox="0 0 200 160" class="w-full h-full drop-shadow-md" shape-rendering="crispEdges">
                     <!-- Outline/Shadow -->
                     <path d="M40 30 L20 60 L50 60 Z" fill="black" transform="translate(4,4)" />
@@ -128,14 +136,14 @@
                     <!-- Head -->
                     <ellipse cx="100" cy="90" rx="85" ry="65" fill="white" stroke="black" stroke-width="4" />
                     
-                    <!-- Eyes (Pixel Style Rects) -->
+                    <!-- Eyes -->
                     <rect x="65" y="95" width="10" height="14" fill="black" class="kitty-eye" />
                     <rect x="125" y="95" width="10" height="14" fill="black" class="kitty-eye" />
                     
                     <!-- Nose -->
                     <ellipse cx="100" cy="115" rx="8" ry="5" fill="#FFC107" stroke="black" stroke-width="2" />
                     
-                    <!-- Whiskers (Straight lines) -->
+                    <!-- Whiskers -->
                     <line x1="40" y1="95" x2="10" y2="95" stroke="black" stroke-width="4" />
                     <line x1="40" y1="105" x2="10" y2="105" stroke="black" stroke-width="4" />
                     <line x1="40" y1="115" x2="10" y2="115" stroke="black" stroke-width="4" />
@@ -152,42 +160,42 @@
                 </svg>
             </div>
 
-            <div class="space-y-4 z-20 mb-8">
-                <h1 class="text-xl md:text-2xl text-pink-600 leading-normal" style="text-shadow: 2px 2px 0px #ffd1dc;">
+            <div class="space-y-4 z-20 mb-6 md:mb-8">
+                <h1 class="text-lg md:text-2xl text-pink-600 leading-normal" style="text-shadow: 2px 2px 0px #ffd1dc;">
                     Helloooo!
                 </h1>
-                <div class="bg-pink-100 border-2 border-black p-4 inline-block transform rotate-1">
-                    <p class="text-xs md:text-sm text-black leading-relaxed">
+                <div class="bg-pink-100 border-2 border-black p-3 md:p-4 inline-block transform rotate-1">
+                    <p class="text-[10px] md:text-sm text-black leading-relaxed">
                         "3afaaaaaaaaaaaaaaaak 3teni busa"
                     </p>
                 </div>
-                <p class="text-[10px] text-gray-500 mt-2">
-                    (INSERT COIN TO KISS)
+                <p class="text-[9px] md:text-[10px] text-gray-500 mt-2">
+                    (TAP TO KISS)
                 </p>
             </div>
 
-            <div class="flex flex-col gap-6 w-full items-center justify-center mt-4 h-40 relative w-full">
+            <div class="flex flex-col gap-4 md:gap-6 w-full items-center justify-center mt-2 h-40 relative w-full">
                 <!-- Yes Button -->
-                <button id="yes-btn" onclick="acceptProposal()" class="pixel-btn bg-pink-500 border-2 border-black text-white py-4 px-8 w-64 flex items-center justify-center gap-3 z-30 cursor-pointer hover:bg-pink-400 no-select">
+                <button id="yes-btn" onclick="acceptProposal()" class="pixel-btn bg-pink-500 border-2 border-black text-white py-3 md:py-4 px-6 md:px-8 w-60 md:w-64 flex items-center justify-center gap-3 z-30 cursor-pointer hover:bg-pink-400 no-select">
                     <span class="text-xl">♥</span> YES
                 </button>
 
                 <!-- No Button -->
-                <button id="no-btn" class="pixel-btn bg-gray-300 border-2 border-black text-gray-600 py-3 px-8 text-xs z-20 cursor-pointer hover:bg-gray-200 no-select w-40">
+                <button id="no-btn" class="pixel-btn bg-gray-300 border-2 border-black text-gray-600 py-3 px-8 text-xs z-20 cursor-pointer hover:bg-gray-200 no-select w-40 touch-none">
                     NO
                 </button>
             </div>
         </div>
 
         <!-- STATE 2: SUCCESS -->
-        <div id="state-success" class="hidden flex-col items-center justify-center h-full py-8">
+        <div id="state-success" class="hidden flex-col items-center justify-center h-full py-8 flex-1">
             <div class="relative mb-6 animate-[float-pixel_2s_infinite]">
                 <!-- Happy Pixel Kitty -->
-                <div class="w-48 h-40 relative">
+                <div class="w-32 h-28 md:w-48 md:h-40 relative">
                     <svg viewBox="0 0 200 160" class="w-full h-full drop-shadow-md" shape-rendering="crispEdges">
                          <!-- Head -->
                         <ellipse cx="100" cy="90" rx="85" ry="65" fill="white" stroke="black" stroke-width="4" />
-                        <!-- Happy Eyes (Arcs) -->
+                        <!-- Happy Eyes -->
                         <path d="M65 100 Q70 90 75 100" stroke="black" stroke-width="4" fill="none" />
                         <path d="M125 100 Q130 90 135 100" stroke="black" stroke-width="4" fill="none" />
                         <!-- Nose -->
@@ -204,29 +212,32 @@
                             <path d="M0 10 C-10 0 -25 0 -25 15 C-25 30 -10 30 0 20 C10 30 25 30 25 15 C25 0 10 0 0 10" fill="#ff0066" stroke="black" stroke-width="4" />
                             <circle cx="0" cy="15" r="5" fill="#ff0066" stroke="black" stroke-width="4" />
                         </g>
-                        <!-- Blush (Pixel Dots) -->
+                        <!-- Blush -->
                         <rect x="45" y="110" width="10" height="6" fill="#f472b6" opacity="0.6" />
                         <rect x="145" y="110" width="10" height="6" fill="#f472b6" opacity="0.6" />
                     </svg>
                 </div>
                 
                 <!-- 8-Bit Hearts -->
-                <div class="absolute -top-10 -left-6 text-red-500 text-4xl animate-bounce">♥</div>
-                <div class="absolute top-0 -right-8 text-pink-500 text-2xl animate-bounce delay-100">♥</div>
+                <div class="absolute -top-10 -left-6 text-red-500 text-3xl md:text-4xl animate-bounce">♥</div>
+                <div class="absolute top-0 -right-8 text-pink-500 text-xl md:text-2xl animate-bounce delay-100">♥</div>
             </div>
 
-            <h2 class="text-2xl text-pink-600 mb-6 leading-tight" style="text-shadow: 2px 2px 0px #000;">
+            <h2 class="text-lg md:text-2xl text-pink-600 mb-6 leading-tight" style="text-shadow: 2px 2px 0px #000;">
                 MISSION PASSED!<br>
                 RESPECT +
             </h2>
             
-            <div class="bg-black text-white p-4 border-4 border-pink-400 pixel-box transform -rotate-1">
-                <p class="text-sm leading-relaxed text-yellow-300">
+            <div class="bg-black text-white p-3 md:p-4 border-4 border-pink-400 pixel-box transform -rotate-1 mx-4">
+                <p class="text-xs md:text-sm leading-relaxed text-yellow-300 mb-3">
                     Kanbghik Bzaaaaf! ❤️
+                </p>
+                <p class="text-[10px] md:text-xs text-pink-200 leading-relaxed border-t-2 border-gray-800 pt-2">
+                    ehm sefte lena dek l busa f instagram layhfdk
                 </p>
             </div>
             
-            <p class="mt-8 text-[10px] text-gray-500 animate-pulse">
+            <p class="mt-8 text-[9px] md:text-[10px] text-gray-500 animate-pulse">
                 PRESS START TO KISS AGAIN
             </p>
         </div>
@@ -239,7 +250,21 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
 
+        // Unlock audio context on first interaction (Required for iOS/Android)
+        function unlockAudio() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Remove listeners once unlocked
+            document.body.removeEventListener('touchstart', unlockAudio);
+            document.body.removeEventListener('click', unlockAudio);
+        }
+
+        document.body.addEventListener('touchstart', unlockAudio);
+        document.body.addEventListener('click', unlockAudio);
+
         function play8BitJump() {
+            // Ensure context is running
             if (audioCtx.state === 'suspended') audioCtx.resume();
             
             const osc = audioCtx.createOscillator();
@@ -310,26 +335,37 @@
             mainCard.style.transform = 'translate(2px, 2px)';
             setTimeout(() => mainCard.style.transform = 'translate(0, 0)', 50);
 
+            // Dynamic Sizing calculation for mobile safety
             const cardRect = mainCard.getBoundingClientRect();
-            const btnWidth = 120; // Approx
-            const btnHeight = 50;
+            
+            // Get actual button size or default if hidden
+            const btnW = noBtn.offsetWidth || 160;
+            const btnH = noBtn.offsetHeight || 50;
+            
+            // Padding safety from edges
+            const padding = 20;
 
-            const maxLeft = cardRect.width - btnWidth - 50; // Padding
-            const maxTop = cardRect.height - btnHeight - 50;
+            // Calculate max available space
+            const maxLeft = cardRect.width - btnW - padding;
+            const maxTop = cardRect.height - btnH - padding;
 
-            const newLeft = Math.random() * maxLeft + 25;
-            const newTop = Math.random() * maxTop + 25;
+            // Generate random position with minimum padding
+            const newLeft = Math.max(padding, Math.random() * maxLeft);
+            const newTop = Math.max(padding, Math.random() * maxTop);
 
             noBtn.style.position = 'absolute';
             noBtn.style.left = newLeft + 'px';
             noBtn.style.top = newTop + 'px';
         }
 
+        // Mouse Hover (Desktop)
         noBtn.addEventListener('mouseenter', moveNoButton);
+        
+        // Touch (Mobile)
         noBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
+            e.preventDefault(); // Prevents click emulations
             moveNoButton();
-        });
+        }, { passive: false });
 
         function acceptProposal() {
             play8BitWin();
@@ -373,7 +409,10 @@
             const symbols = ['♥', '+', '★']; // Simple pixel shapes
             const colors = ['text-pink-400', 'text-purple-400', 'text-blue-400'];
             
-            for (let i = 0; i < 15; i++) {
+            // Less particles on mobile for performance
+            const particleCount = window.innerWidth < 640 ? 10 : 20;
+            
+            for (let i = 0; i < particleCount; i++) {
                 const el = document.createElement('div');
                 el.innerText = symbols[Math.floor(Math.random() * symbols.length)];
                 
