@@ -129,6 +129,11 @@ window.FirebaseProfile = {
   },
 };
 
+// ─── Expose RTDB helpers for non-module watch party code ────────────────────
+// The watch party scripts run in regular <script> tags (not ES modules) and
+// cannot import from firebase-database.js directly. We bridge the gap here.
+window._firebaseRTDB = { getDatabase, ref, set, get, remove, onValue };
+
 // ─── Auth state observer ─────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
   if (user) {
