@@ -8,11 +8,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css">
 <script type="module" src="firebase-config.js"></script>
-
+<script src="app.js"></script>
 
 
 </head>
 <body>
+<!-- ═══ ANTI-FLASH: auth screen hidden until Firebase resolves ═══ -->
+<script>
+// The simplest fix: authScreen starts display:none (set on the element).
+// firebase-config.js will call authScreen.style.display = 'flex' if no user is found.
+// That still works fine. The flash is gone because we no longer start visible.
+</script>
 
 <!-- ═══════════════════════════════════════════════════════════
      AUTH SCREEN
@@ -79,6 +85,22 @@ async function doSignOut() {
   if (typeof showToast === 'function') showToast('👋 Signed out. See you soon!');
 }
 
+async function doGoogleSignIn() {
+  const btns = ['googleSignInBtn','googleSignUpBtn'].map(id => document.getElementById(id)).filter(Boolean);
+  btns.forEach(b => { b.disabled = true; b.querySelector('span').textContent = 'Connecting…'; });
+  document.getElementById('authError').classList.remove('visible');
+  try {
+    await window._fbGoogleSignIn();
+  } catch(e) {
+    let msg = 'Google sign-in failed. Please try again.';
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') msg = 'Sign-in window was closed.';
+    else if (e.code === 'auth/popup-blocked') msg = 'Pop-up blocked — please allow pop-ups for this site.';
+    else if (e.code === 'auth/network-request-failed') msg = 'Network error. Check your connection.';
+    showAuthError(msg);
+    btns.forEach(b => { b.disabled = false; b.querySelector('span').textContent = 'Continue with Google'; });
+  }
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('authScreen').style.display !== 'none') {
     const loginActive = document.getElementById('authTabLogin').classList.contains('active');
@@ -87,7 +109,8 @@ document.addEventListener('keydown', e => {
 });
 </script>
 
-<div id="authScreen">
+<div id="authScreen" style="display:none">
+<!-- Auth flash fix: authScreen is hidden by default. firebase-config.js shows it only when no user is logged in. -->
   <div class="auth-bg">
     <div class="auth-bg-grid"></div>
     <div class="auth-bg-orb1"></div>
@@ -120,6 +143,16 @@ document.addEventListener('keydown', e => {
       <button class="auth-btn" id="loginBtn" onclick="doSignIn()">
         Sign In to StreamVault
       </button>
+      <div class="auth-divider"><span>or continue with</span></div>
+      <button class="auth-google-btn" id="googleSignInBtn" onclick="doGoogleSignIn()" type="button">
+        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+          <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 29.8 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.4-.1-2.7-.5-4z"/>
+          <path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.2 19.2 13 24 13c3.1 0 6 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 16.3 3 9.7 7.9 6.3 14.7z"/>
+          <path fill="#FBBC05" d="M24 45c5.5 0 10.5-1.9 14.4-5l-6.7-5.5C29.8 36.1 27 37 24 37c-5.8 0-10.7-3.9-12.4-9.3l-7 5.4C8.1 40.5 15.5 45 24 45z"/>
+          <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.7l6.7 5.5C42 36.2 45 30.5 45 24c0-1.4-.2-2.7-.5-4z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
     </div>
 
     <!-- Sign Up Form -->
@@ -138,6 +171,16 @@ document.addEventListener('keydown', e => {
       </div>
       <button class="auth-btn" id="signupBtn" onclick="doSignUp()">
         Create Account
+      </button>
+      <div class="auth-divider"><span>or continue with</span></div>
+      <button class="auth-google-btn" id="googleSignUpBtn" onclick="doGoogleSignIn()" type="button">
+        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+          <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 29.8 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.4-.1-2.7-.5-4z"/>
+          <path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.2 19.2 13 24 13c3.1 0 6 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 16.3 3 9.7 7.9 6.3 14.7z"/>
+          <path fill="#FBBC05" d="M24 45c5.5 0 10.5-1.9 14.4-5l-6.7-5.5C29.8 36.1 27 37 24 37c-5.8 0-10.7-3.9-12.4-9.3l-7 5.4C8.1 40.5 15.5 45 24 45z"/>
+          <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.7l6.7 5.5C42 36.2 45 30.5 45 24c0-1.4-.2-2.7-.5-4z"/>
+        </svg>
+        <span>Continue with Google</span>
       </button>
     </div>
   </div>
@@ -353,13 +396,16 @@ document.addEventListener('keydown', e => {
 <!-- ===== NAV ===== -->
 <nav>
   <a href="#" class="nav-logo"><span class="logo-dot"></span>StreamVault</a>
+
   <ul class="nav-links">
     <li><a class="active" onclick="filterGenre('All',null);setActive(this)">Home</a></li>
     <li><a onclick="quickFilter('movie');setActive(this)">Movies</a></li>
     <li><a onclick="quickFilter('tv');setActive(this)">Series</a></li>
     <li><a onclick="filterGenre('All',null);setActive(this)">Trending</a></li>
   </ul>
-  <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;overflow:hidden;">
+
+  <div class="nav-right">
+    <!-- Search -->
     <div class="search-wrap">
       <div class="search-box">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--muted);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -367,38 +413,79 @@ document.addEventListener('keydown', e => {
         <button id="searchClearBtn" onclick="clearSearch()" title="Clear search" style="display:none;background:none;border:none;cursor:pointer;color:var(--muted);padding:0;font-size:14px;line-height:1;flex-shrink:0;" aria-label="Clear search">✕</button>
         <span class="shortcut-hint" id="searchShortcutHint">/</span>
       </div>
+      <!-- Desktop search results — positioned absolutely under the search box -->
+      <div class="search-results" id="searchResults" style="display:none;min-width:300px;"></div>
     </div>
 
-    <!-- POINTS BUTTON -->
+    <!-- Watchlist -->
+    <button class="nav-wl-btn" onclick="toggleWatchlist()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Watchlist <span class="wl-count" id="wlCount">0</span>
+    </button>
 
-    <button id="randomBtn" onclick="openRandom()" title="Random Pick"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg> Random</button>
-    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Dark</button>
-    <button class="nav-stats-btn" onclick="openCollections()" title="Collections">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      Lists
+    <!-- Notifications -->
+    <button class="notif-btn" onclick="toggleNotifPanel()" title="Notifications" id="notifBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notif-badge" id="notifBadge">0</span>
     </button>
-    <button class="nav-compare-btn" onclick="toggleCompare()" title="Compare Titles">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Compare <span class="compare-count-badge" id="compareBadge">0</span>
-    </button>
-    <button class="nav-stats-btn" onclick="toggleFocusMode()" title="Focus Mode" id="focusModeBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
-      Focus
-    </button>
-    <button class="nav-stats-btn" onclick="openSleepTimerModal()" title="Sleep Timer">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-      Sleep
-    </button>
-    <button class="nav-stats-btn" onclick="openKbHelp()" title="Keyboard Shortcuts">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
-      Keys
-    </button>
-    <button class="nav-stats-btn" onclick="openWatchTogetherModal()" title="Watch Together" id="watchTogetherNavBtn" style="display:flex;align-items:center;gap:5px;color:var(--accent2);border-color:rgba(232,98,42,0.3)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Watch Together
-    </button>
-    <button class="notif-btn" onclick="toggleNotifPanel()" title="Activity Log" id="notifBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge" id="notifBadge">0</span></button>
-    <button class="nav-wl-btn" onclick="toggleWatchlist()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> List <span class="wl-count" id="wlCount">0</span></button>
+
+    <!-- ── HAMBURGER MENU (desktop + mobile) ── -->
+    <div class="nav-menu-wrap" id="navMenuWrap">
+      <button class="nav-hamburger" id="navHamburgerBtn" onclick="toggleNavMenu()" aria-label="More options" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-dropdown" id="navDropdown">
+        <div class="nav-dropdown-section">
+          <div class="nav-dropdown-label">Discover</div>
+          <button class="nav-dropdown-item" onclick="openRandom();closeNavMenu()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+            Random Pick
+          </button>
+          <button class="nav-dropdown-item" onclick="openCollections();closeNavMenu()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            My Collections
+          </button>
+          <button class="nav-dropdown-item" onclick="toggleCompare();closeNavMenu()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Compare Titles <span class="compare-count-badge" id="compareBadge" style="margin-left:auto">0</span>
+          </button>
+        </div>
+        <div class="nav-dropdown-section">
+          <div class="nav-dropdown-label">Playback</div>
+          <button class="nav-dropdown-item" onclick="openWatchTogetherModal();closeNavMenu()" id="watchTogetherNavBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Watch Together
+          </button>
+          <button class="nav-dropdown-item" onclick="openSleepTimerModal();closeNavMenu()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            Sleep Timer
+          </button>
+          <button class="nav-dropdown-item" onclick="toggleFocusMode();closeNavMenu()" id="focusModeBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+            Focus Mode
+          </button>
+        </div>
+        <div class="nav-dropdown-section">
+          <div class="nav-dropdown-label">Settings</div>
+          <button class="nav-dropdown-item" onclick="toggleTheme();closeNavMenu()" id="themeToggle">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            Toggle Theme
+          </button>
+          <button class="nav-dropdown-item" onclick="openKbHelp();closeNavMenu()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
+            Keyboard Shortcuts
+          </button>
+        </div>
+        <!-- Mobile-only nav links inside dropdown -->
+        <div class="nav-dropdown-section nav-dropdown-mobile-links">
+          <div class="nav-dropdown-label">Navigate</div>
+          <button class="nav-dropdown-item" onclick="filterGenre('All',null);setActive(this);closeNavMenu()">🏠 Home</button>
+          <button class="nav-dropdown-item" onclick="quickFilter('movie');setActive(this);closeNavMenu()">🎬 Movies</button>
+          <button class="nav-dropdown-item" onclick="quickFilter('tv');setActive(this);closeNavMenu()">📺 Series</button>
+          <button class="nav-dropdown-item" onclick="filterGenre('All',null);setActive(this);closeNavMenu()">🔥 Trending</button>
+        </div>
+      </div>
+    </div>
 
     <!-- USER PROFILE -->
     <div class="user-avatar-wrap" onclick="openProfileModal()" id="navAvatarWrap" title="My Profile">
@@ -408,11 +495,90 @@ document.addEventListener('keydown', e => {
     </div>
   </div>
 
-  <!-- MOBILE HAMBURGER -->
-  <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileDrawer()" aria-label="Menu">
+  <!-- MOBILE HAMBURGER (kept for backward compat with drawer) -->
+  <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileDrawer()" aria-label="Menu" style="display:none">
     <span></span><span></span><span></span>
   </button>
 </nav>
+
+<script>
+function toggleNavMenu() {
+  const wrap = document.getElementById('navMenuWrap');
+  const btn = document.getElementById('navHamburgerBtn');
+  const isOpen = wrap.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen);
+}
+function closeNavMenu() {
+  document.getElementById('navMenuWrap').classList.remove('open');
+  document.getElementById('navHamburgerBtn').setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('navMenuWrap');
+  if (wrap && !wrap.contains(e.target)) closeNavMenu();
+  // Close hero mobile search results when clicking outside
+  const heroSearch = document.getElementById('heroMobileSearch');
+  const mobileResults = document.getElementById('mobileNavResults');
+  if (mobileResults && mobileResults.style.display !== 'none') {
+    if (!heroSearch || !heroSearch.contains(e.target)) {
+      mobileResults.style.display = 'none';
+    }
+  }
+});
+
+// Hide mobile search results on any scroll
+window.addEventListener('scroll', function() {
+  const mobileResults = document.getElementById('mobileNavResults');
+  if (mobileResults) mobileResults.style.display = 'none';
+}, { passive: true });
+
+// ── Mobile nav search (the bar embedded in the top nav on mobile) ──
+let _mobileNavST;
+function handleMobileNavSearch(q) {
+  clearTimeout(_mobileNavST);
+  const results = document.getElementById('mobileNavResults');
+  const clearBtn = document.getElementById('mobileNavClearBtn');
+  if (clearBtn) clearBtn.style.display = q.trim() ? 'block' : 'none';
+  if (!q.trim()) { if (results) results.style.display = 'none'; return; }
+  _mobileNavST = setTimeout(function() {
+    if (typeof allContent === 'undefined' || !allContent) return;
+    const ql = q.toLowerCase();
+    const filtered = allContent.filter(function(i) {
+      return i.title.toLowerCase().includes(ql) ||
+        (i.year && String(i.year).includes(ql)) ||
+        (i.genres && i.genres.some(function(g){ return g.toLowerCase().includes(ql); }));
+    });
+    const res = (typeof getUnique === 'function' ? getUnique(filtered) : filtered).slice(0, 10);
+    const IMG = 'https://image.tmdb.org/t/p/w92';
+    const html = !res.length
+      ? '<div style="padding:14px 16px;color:var(--muted);font-size:14px;text-align:center;">No results for "<strong style=\"color:var(--text)\">' + q + '</strong>"</div>'
+      : res.map(function(r) {
+          return '<div class="sr-item" onclick=\'openFromSearch(' + JSON.stringify(r).replace(/'/g,"&#39;") + ');closeMobileNavSearch()\'>' +
+            '<img class="sr-thumb" src="' + IMG + r.poster + '" alt="' + r.title + '" onerror="this.style.opacity=0.2"/>' +
+            '<div style="flex:1;min-width:0"><div class="sr-title">' + r.title + '</div>' +
+            '<div class="sr-sub">' + r.year + ' · ' + (r.type==='tv'?'Series':'Movie') + ' · ★' + r.rating + '</div></div></div>';
+        }).join('');
+    if (results) { results.innerHTML = html; results.style.display = 'block'; }
+  }, 200);
+}
+
+function clearMobileNavSearch() {
+  const input = document.getElementById('mobileNavSearchInput');
+  const results = document.getElementById('mobileNavResults');
+  const clearBtn = document.getElementById('mobileNavClearBtn');
+  if (input) { input.value = ''; input.focus(); }
+  if (results) results.style.display = 'none';
+  if (clearBtn) clearBtn.style.display = 'none';
+}
+
+function closeMobileNavSearch() {
+  const input = document.getElementById('mobileNavSearchInput');
+  const results = document.getElementById('mobileNavResults');
+  const clearBtn = document.getElementById('mobileNavClearBtn');
+  if (input) input.value = '';
+  if (results) results.style.display = 'none';
+  if (clearBtn) clearBtn.style.display = 'none';
+}
+</script>
 
 <!-- MOBILE DRAWER OVERLAY -->
 <div class="mobile-drawer-overlay" id="mobileDrawerOverlay" onclick="closeMobileDrawer()"></div>
@@ -461,6 +627,19 @@ document.addEventListener('keydown', e => {
     <div class="hero-actions">
       <button class="btn btn-primary" id="heroWatchBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg> Watch Now</button>
       <button class="btn btn-ghost" onclick="document.getElementById('sec-trending').scrollIntoView({behavior:'smooth'})">Browse All</button>
+    </div>
+
+    <!-- Mobile-only search bar — shown below buttons on small screens -->
+    <div class="hero-mobile-search" id="heroMobileSearch">
+      <div class="hero-mobile-search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--muted);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search movies & series..." id="mobileNavSearchInput"
+          oninput="handleMobileNavSearch(this.value)"
+          autocomplete="off"/>
+        <button id="mobileNavClearBtn" onclick="clearMobileNavSearch()" title="Clear"
+          style="display:none;background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;flex-shrink:0;line-height:1;padding:0;">✕</button>
+      </div>
+      <div id="mobileNavResults" class="hero-mobile-search-results"></div>
     </div>
     <div class="hero-meta">
       <span><span class="star">★</span> 9.2 IMDb</span>
@@ -571,6 +750,9 @@ document.addEventListener('keydown', e => {
   <div class="bottom-nav-item" onclick="toggleWatchlist()">
     <span class="bn-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>List
   </div>
+  <div class="bottom-nav-item" onclick="openProfileModal()" id="bottomNavProfile">
+    <span class="bn-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><span id="bottomNavProfileLabel">Profile</span>
+  </div>
 </nav>
 
 <!-- ===== SEE ALL MODAL ===== -->
@@ -620,10 +802,18 @@ document.addEventListener('keydown', e => {
       </div>
       <button class="modal-close" onclick="closeAll()">✕</button>
     </div>
-    <div class="modal-player" id="modalPlayerWrap">
+    <div class="modal-player" id="modalPlayerWrap" style="position:relative">
       <iframe id="playerFrame" src="" allowfullscreen
         allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
         referrerpolicy="no-referrer"></iframe>
+      <!-- Guest blocker: covers iframe so guests cannot interact with it -->
+      <div id="wtGuestBlocker" style="
+        display:none;
+        position:absolute;inset:0;
+        z-index:10;
+        cursor:not-allowed;
+        background:transparent;
+      " title="Only the host can control playback"></div>
     </div>
     <!-- NEXT/PREV EPISODE NAV -->
     <div class="ep-nav-bar" id="epNavBar">
@@ -634,11 +824,15 @@ document.addEventListener('keydown', e => {
 
 
     <!-- SERVER BAR -->
-    <div class="theater-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:center;gap:5px;">
+    <div class="theater-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
         <span style="font-size:11px;color:var(--muted);font-family:var(--font-display);font-weight:600;white-space:nowrap;">Server:</span>
-        <button class="src-btn active" onclick="switchSource(0)" title="Our Server">S1</button>
+        <button class="src-btn active" onclick="switchSource(0)" title="Source 1 — VidKing">S1</button>
+        <button class="src-btn" onclick="switchSource(1)" title="Source 2 — MultiEmbed">S2</button>
+        <button class="src-btn" onclick="switchSource(2)" title="Source 3 — AutoEmbed">S3</button>
+        <button class="src-btn" onclick="switchSource(3)" title="Source 4 — VidKing Alt">S4</button>
       </div>
+      <button id="lightsBtn" onclick="toggleTheaterMode()" title="Theater mode" style="font-size:11px;padding:5px 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted);cursor:pointer;white-space:nowrap;">💡 Lights Out</button>
     </div>
   </div>
 </div>
@@ -712,6 +906,50 @@ document.addEventListener('keydown', e => {
   </div>
   <img class="mini-player-thumb" id="miniPlayerThumb" src="" alt="Now Playing" onclick="expandMiniPlayer()"/>
   <div class="mini-player-info" id="miniPlayerInfo"></div>
+</div>
+
+<!-- ===== WATCH TOGETHER: GUEST STREAM VIEWER ===== -->
+<div id="wtStreamModal" style="
+  display:none;position:fixed;inset:0;z-index:10000;
+  background:#000;flex-direction:column;
+">
+  <!-- Header bar -->
+  <div style="
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;background:rgba(0,0,0,0.85);
+    border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;
+  ">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#e8622a;display:inline-block;animation:pulse 1.4s infinite"></span>
+      <span id="wtStreamTitle" style="font-family:var(--font-display);font-weight:700;font-size:.9rem;color:#fff">Watch Together</span>
+      <span style="font-size:11px;color:rgba(255,255,255,0.45);background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:20px">LIVE</span>
+    </div>
+    <button onclick="wtGuestLeave()" style="
+      background:rgba(255,255,255,0.08);border:none;color:#fff;
+      padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;
+    ">Leave</button>
+  </div>
+  <!-- Guest iframe — same embed URL as host, seeked to correct timestamp -->
+  <div style="position:relative;flex:1;width:100%;background:#000">
+    <iframe id="wtGuestFrame" src="" allowfullscreen
+      allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
+      referrerpolicy="no-referrer"
+      style="width:100%;height:100%;border:none;display:block"></iframe>
+    <!-- Absolute blocker: covers iframe so guest cannot interact -->
+    <div id="wtGuestBlockerModal" style="
+      position:absolute;inset:0;z-index:5;
+      background:transparent;cursor:not-allowed;
+    " title="Only the host controls playback"></div>
+    <!-- Connecting spinner -->
+    <div id="wtStreamStatus" style="
+      position:absolute;inset:0;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:12px;pointer-events:none;
+      background:rgba(0,0,0,0.7);z-index:6;
+    ">
+      <div style="width:36px;height:36px;border:3px solid rgba(232,98,42,0.3);border-top-color:#e8622a;border-radius:50%;animation:spin 0.9s linear infinite"></div>
+      <div style="color:rgba(255,255,255,0.7);font-size:14px;font-family:var(--font-display)" id="wtStreamStatusText">Waiting for host to start…</div>
+    </div>
+  </div>
 </div>
 
 <footer>
@@ -7001,6 +7239,8 @@ const BADGES = ['🎬','🎥','🍿','⭐','🏆','🎭','🎞️','🦁','🐉'
 const COLORS = ['#e8622a','#f59060','#3b82f6','#8b5cf6','#ec4899','#10b981','#f59e0b','#ef4444','#06b6d4','#84cc16','#fff','#a78bfa'];
 
 function openProfileModal() {
+  // Always close mobile search results first
+  if (typeof closeMobileNavSearch === 'function') closeMobileNavSearch();
   const p = window._svProfile || { name: username, badge: '🎬', color: 'var(--accent)', bio: '' };
   // Fill form
   document.getElementById('profileNameInput').value = p.name || '';
@@ -7248,15 +7488,41 @@ function shareContent() {
   if (!currentItem) return;
   const baseUrl = window.location.origin + window.location.pathname;
   const shareUrl = `${baseUrl}?type=${currentItem.type}&id=${currentItem.tmdbId}`;
-  const text = `Watching ${currentItem.title} on StreamVault!\n🎥 ${shareUrl}`;
-  
-  navigator.clipboard.writeText(text)
-    .then(() => {
-      showToast('🔗 Link copied to clipboard!');
+  const text = `Watching ${currentItem.title} on StreamVault!`;
+
+  // Use native Web Share API if available (mobile browsers)
+  if (navigator.share) {
+    navigator.share({
+      title: currentItem.title,
+      text: text,
+      url: shareUrl,
+    }).then(() => {
+      showToast('🔗 Shared successfully!');
       FirebaseDB.setItem('sv_shared', '1');
       addNotif(`🔗 Shared <strong>${currentItem.title}</strong>`);
-    })
-    .catch(() => showToast('Failed to copy.'));
+    }).catch((err) => {
+      // User cancelled — not an error worth toasting
+      if (err.name !== 'AbortError') showToast('Could not share.');
+    });
+    return;
+  }
+
+  // Fallback: clipboard API
+  const fullText = `${text}\n🎥 ${shareUrl}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(fullText)
+      .then(() => {
+        showToast('🔗 Link copied to clipboard!');
+        FirebaseDB.setItem('sv_shared', '1');
+        addNotif(`🔗 Shared <strong>${currentItem.title}</strong>`);
+      })
+      .catch(() => {
+        // Last resort: prompt
+        prompt('Copy this link to share:', shareUrl);
+      });
+  } else {
+    prompt('Copy this link to share:', shareUrl);
+  }
 }
 
 function toggleCompleted() {
@@ -8025,12 +8291,19 @@ const PLAYER_SOURCES = [
 
 let _currentSourceIdx = 0;
 
-function loadPlayer() {
+function loadPlayer(startOffsetSec) {
   const it = currentItem;
   const src = PLAYER_SOURCES[_currentSourceIdx];
+  // Some embeds accept a start/t param for seek-on-load
+  const t = (startOffsetSec && startOffsetSec > 3) ? Math.floor(startOffsetSec) : 0;
+  function addT(url) {
+    if (!t) return url;
+    const sep = url.includes('?') ? '&' : '?';
+    return url + sep + 't=' + t + '&start=' + t;
+  }
   const url = it.type === 'movie'
-    ? src.movie(it.tmdbId)
-    : src.tv(it.tmdbId, currentSeason, currentEpisode);
+    ? addT(src.movie(it.tmdbId))
+    : addT(src.tv(it.tmdbId, currentSeason, currentEpisode));
   document.getElementById('playerFrame').src = url;
   // Update source button labels
   document.querySelectorAll('.src-btn').forEach((btn, i) => {
@@ -8074,13 +8347,7 @@ function detailOverlayClick(e) { if(e.target===document.getElementById('detailMo
 
 let _st;
 function _positionSearchDropdown() {
-  const input = document.getElementById('searchInput');
-  const box = document.getElementById('searchResults');
-  if(!input || !box) return;
-  const rect = input.closest('.search-wrap').getBoundingClientRect();
-  box.style.top = (rect.bottom + 6) + 'px';
-  box.style.left = rect.left + 'px';
-  box.style.width = Math.max(rect.width, 280) + 'px';
+  // no-op: #searchResults is now inside .search-wrap, positioned via CSS
 }
 
 function handleSearch(q) {
@@ -8928,209 +9195,306 @@ function setPlaybackSpeed(speed, btn) {
   // Note: real speed control would need postMessage to iframe
 }
 
-/* ---- F5: WATCH PARTY COUNTDOWN TIMER ---- */
-/* =====================================================
-   ===== WATCH TOGETHER — Host/Join via shared room =====
-   Host creates a room; guests join via shared link.
-   Sync via BroadcastChannel (same browser) + localStorage
-   polling (cross-tab). Share ?wtroom=ROOMID in URL.
-===================================================== */
+/* ---- WATCH TOGETHER — Timestamp-Sync Embed Share ---- */
+/*
+  Architecture (no WebRTC, no screen capture):
+  HOST  → opens the normal player (embed iframe) for themselves
+        → on play/pause writes state to Firebase RTDB:
+            watch_parties/{roomId}/state = { tmdbId, type, sourceIdx, season, episode,
+                                              playing, startedAt, pausedAt, ts }
+        → every 15 s re-broadcasts current timestamp (drift correction tick)
+  GUEST → shows a fullscreen modal with its OWN embed iframe pointing at the
+            identical embed URL; a transparent overlay blocks all clicks
+        → listens to Firebase state; on every change reloads the iframe
+            to the correct seek position — silent and automatic
+*/
 
-let wtRoomId = null;
-let wtRole = null; // 'host' | 'guest'
-let wtItem = null;
-let wtChannel = null;
-let wtPollInterval = null;
-let wtStartTime = null;
-let wtPaused = true;
-let wtPauseOffset = 0;
+// ── State ───────────────────────────────────────────────────────────────────
+let wtRoomId      = null;
+let wtRole        = null;   // 'host' | 'guest'
+let wtItem        = null;
+let wtPaused      = true;
+let wtStartTime   = null;   // wall-clock ms when play was last pressed (host)
+let wtPauseOffset = 0;      // accumulated seconds before latest play
 let partyInterval = null;
-let partySeconds = 0;
+let partySeconds  = 0;
 
-function wtGenId() {
-  return Math.random().toString(36).slice(2,8).toUpperCase();
-}
-// ── Watch Together: Firebase Realtime DB sync ──────────────────────────────
-// State is stored at watch_parties/{roomId} in Firebase RTDB so all devices
-// sharing the same room ID read/write the same node in real time.
+let _wtUnsubscribe  = null;   // Firebase state listener (guest)
+let _wtCachedState  = null;
+let _wtSyncInterval = null;   // host periodic drift-correction tick
 
-let _wtUnsubscribe = null;      // Firebase onValue unsubscribe handle
-let _wtCachedState = null;      // Latest state snapshot pushed by Firebase
+function wtGenId() { return Math.random().toString(36).slice(2,8).toUpperCase(); }
 
-function _wtAttachListener(id) {
-  // Detach any previous listener first
-  if (_wtUnsubscribe) { try { _wtUnsubscribe(); } catch(e){} _wtUnsubscribe = null; }
-  _wtCachedState = null;
-  if (!id) return;
-  try {
-    const { getDatabase, ref, onValue } = window._firebaseRTDB;
-    _wtUnsubscribe = onValue(ref(getDatabase(), 'watch_parties/' + id), function(snap) {
-      _wtCachedState = snap.exists() ? snap.val() : null;
-      // Immediately process any incoming state change
-      if (_wtCachedState && wtRole === 'guest') wtHandleMsg(_wtCachedState);
-      if (_wtCachedState && wtRole === 'host' && _wtCachedState.action === 'end') {
-        showToast('Session ended.'); wtCleanup(); wtHideHUD();
-      }
-    }, function(err) { console.warn('[WT] listener error', err); });
-  } catch(e) { console.warn('[WT] _wtAttachListener failed', e); }
+// ── Firebase helpers ─────────────────────────────────────────────────────────
+function _wtDb()            { return window._firebaseRTDB.getDatabase(); }
+function _wtRef(path)       { return window._firebaseRTDB.ref(_wtDb(), path); }
+function _wtSet(path, val)  { return window._firebaseRTDB.set(_wtRef(path), val).catch(e => console.warn('[WT]', e)); }
+function _wtRemove(path)    { return window._firebaseRTDB.remove(_wtRef(path)).catch(() => {}); }
+function _wtListen(path,cb) { return window._firebaseRTDB.onValue(_wtRef(path), cb); }
+
+// ── Compute current playback second (host side) ──────────────────────────────
+function wtCurrentSec() {
+  if (wtPaused || !wtStartTime) return wtPauseOffset;
+  return wtPauseOffset + (Date.now() - wtStartTime) / 1000;
 }
 
-function wtSaveState(state) {
-  if (!wtRoomId) return;
-  const payload = Object.assign({}, state, { ts: Date.now() });
-  try {
-    const { getDatabase, ref, set } = window._firebaseRTDB;
-    set(ref(getDatabase(), 'watch_parties/' + wtRoomId), payload).catch(function(e){ console.warn('[WT] write failed', e); });
-  } catch(e) { console.warn('[WT] wtSaveState error', e); }
+// ── Write full state to Firebase ─────────────────────────────────────────────
+function wtBroadcast(action) {
+  if (!wtRoomId || wtRole !== 'host') return;
+  const src = PLAYER_SOURCES[_currentSourceIdx] || PLAYER_SOURCES[0];
+  _wtSet('watch_parties/' + wtRoomId + '/state', {
+    action:    action,
+    tmdbId:    wtItem ? wtItem.tmdbId : null,
+    type:      wtItem ? wtItem.type   : null,
+    title:     wtItem ? wtItem.title  : null,
+    sourceIdx: _currentSourceIdx,
+    season:    currentSeason,
+    episode:   currentEpisode,
+    playing:   !wtPaused,
+    startedAt: wtPaused ? null : wtStartTime,
+    pausedAt:  wtPaused ? wtPauseOffset : null,
+    currentSec: wtCurrentSec(),
+    ts:        Date.now(),
+  });
 }
 
-function wtReadState() {
-  // Returns the last value pushed by the Firebase listener (may be null until first snapshot arrives)
-  return _wtCachedState;
+// ── HOST: start a session ────────────────────────────────────────────────────
+async function wtHost() {
+  if (!currentItem) { showToast('Open a movie or series first!'); return; }
+
+  wtCleanup();
+  wtRoomId = wtGenId();
+  wtRole   = 'host';
+  wtItem   = currentItem;
+  wtPaused = true;
+  wtStartTime   = null;
+  wtPauseOffset = 0;
+
+  await _wtSet('watch_parties/' + wtRoomId, {
+    title:  wtItem.title,
+    tmdbId: wtItem.tmdbId,
+    type:   wtItem.type,
+    host:   (window._svProfile && window._svProfile.name) || 'Host',
+    ts:     Date.now(),
+  });
+
+  // Open the player for the host just like normal
+  playNow();
+  // Show the guest blocker on host side too (host has their own controls)
+  // No blocker needed — host controls the real player normally
+
+  // Start drift-correction broadcast every 15 s
+  _wtSyncInterval = setInterval(function() {
+    if (wtRoomId && wtRole === 'host') wtBroadcast('sync');
+  }, 15000);
+
+  wtShowHUD();
+  closeWatchTogetherModal();
+  showToast('🎬 Session ready! Share the invite link with friends.');
 }
 
-function wtCleanup() {
-  clearInterval(wtPollInterval);
-  if (_wtUnsubscribe) { try { _wtUnsubscribe(); } catch(e){} _wtUnsubscribe = null; }
-  _wtCachedState = null;
-  if (wtChannel) { try { wtChannel.close(); } catch(e){} wtChannel = null; }
-  // Only the host removes the room node on cleanup
-  if (wtRoomId && wtRole === 'host') {
-    try {
-      const { getDatabase, ref, remove } = window._firebaseRTDB;
-      remove(ref(getDatabase(), 'watch_parties/' + wtRoomId)).catch(function(){});
-    } catch(e){}
+// ── HOST: play ───────────────────────────────────────────────────────────────
+function wtHostPlay() {
+  if (wtRole !== 'host') return;
+  wtPaused    = false;
+  wtStartTime = Date.now();
+  wtBroadcast('play');
+}
+
+// ── HOST: pause ──────────────────────────────────────────────────────────────
+function wtHostPause() {
+  if (wtRole !== 'host') return;
+  wtPauseOffset = wtCurrentSec();
+  wtPaused      = true;
+  wtStartTime   = null;
+  wtBroadcast('pause');
+}
+
+// ── HOST: seek (call after seeking in the player) ───────────────────────────
+function wtHostSeek() {
+  if (wtRole !== 'host') return;
+  wtBroadcast(wtPaused ? 'pause' : 'play');
+}
+
+// ── GUEST: join a room ───────────────────────────────────────────────────────
+async function wtJoin(roomId) {
+  wtCleanup();
+  wtRoomId = roomId;
+  wtRole   = 'guest';
+
+  // Show the guest modal immediately with spinner
+  const modal = document.getElementById('wtStreamModal');
+  if (modal) modal.style.display = 'flex';
+  const statusEl = document.getElementById('wtStreamStatus');
+  const statusTxt = document.getElementById('wtStreamStatusText');
+  if (statusEl) statusEl.style.display = 'flex';
+  if (statusTxt) statusTxt.textContent = 'Waiting for host to start…';
+
+  wtShowHUD();
+
+  // Listen to host state
+  _wtUnsubscribe = _wtListen('watch_parties/' + roomId + '/state', function(snap) {
+    if (!snap.exists()) return;
+    const s = snap.val();
+    _wtCachedState = s;
+    wtGuestApply(s);
+  });
+}
+
+// ── GUEST: apply a state update from Firebase ────────────────────────────────
+function wtGuestApply(s) {
+  if (!s) return;
+
+  // Update item info
+  if (s.tmdbId && (!wtItem || String(wtItem.tmdbId) !== String(s.tmdbId))) {
+    const found = allContent.find(i => String(i.tmdbId) === String(s.tmdbId) && i.type === s.type);
+    wtItem = found || { title: s.title || 'Watch Together', tmdbId: s.tmdbId, type: s.type };
+    const titleEl = document.getElementById('wtStreamTitle');
+    if (titleEl) titleEl.textContent = wtItem.title || 'Watch Together';
+    wtUpdateHUD();
   }
-  wtRoomId = null; wtRole = null; wtItem = null; wtPaused = true; wtStartTime = null; wtPauseOffset = 0;
+
+  if (s.action === 'end') {
+    showToast('Host ended the Watch Together session.');
+    wtCleanup(); wtHideHUD();
+    const modal = document.getElementById('wtStreamModal');
+    if (modal) modal.style.display = 'none';
+    return;
+  }
+
+  // Build the correct embed URL at the right timestamp
+  const srcIdx = (typeof s.sourceIdx === 'number' && s.sourceIdx >= 0 && s.sourceIdx < PLAYER_SOURCES.length)
+    ? s.sourceIdx : 0;
+  const src = PLAYER_SOURCES[srcIdx];
+  if (!src || !s.tmdbId) return;
+
+  // Calculate seek position
+  let seekSec = 0;
+  if (s.playing && s.startedAt) {
+    seekSec = (s.currentSec || 0) + (Date.now() - s.ts) / 1000;
+  } else {
+    seekSec = s.currentSec || s.pausedAt || 0;
+  }
+  seekSec = Math.max(0, Math.floor(seekSec));
+
+  // Build URL with seek param
+  function addSeek(url) {
+    if (seekSec < 3) return url;
+    const sep = url.includes('?') ? '&' : '?';
+    return url + sep + 't=' + seekSec + '&start=' + seekSec;
+  }
+
+  const season  = s.season  || 1;
+  const episode = s.episode || 1;
+  const url = s.type === 'movie'
+    ? addSeek(src.movie(s.tmdbId))
+    : addSeek(src.tv(s.tmdbId, season, episode));
+
+  const frameEl = document.getElementById('wtGuestFrame');
+  const modal   = document.getElementById('wtStreamModal');
+
+  if (frameEl) {
+    // Only reload if URL meaningfully changed (avoids constant reload on sync ticks
+    // unless drift > 5 s)
+    const existing = frameEl.src || '';
+    const existingBase = existing.split('?')[0];
+    const newBase      = url.split('?')[0];
+    const existingT    = parseInt((existing.match(/[?&]t=(\d+)/) || [])[1] || '0', 10);
+    const drift = Math.abs(seekSec - existingT);
+
+    if (existingBase !== newBase || drift > 5 || s.action === 'play' || s.action === 'pause') {
+      frameEl.src = url;
+    }
+  }
+
+  if (modal) modal.style.display = 'flex';
+
+  // Hide spinner once we have a URL
+  const statusEl = document.getElementById('wtStreamStatus');
+  if (statusEl && url) statusEl.style.display = 'none';
+
+  // Keep HUD updated
+  const subEl = document.getElementById('partySub');
+  if (subEl) subEl.textContent = s.playing ? 'Playing live' : 'Paused';
 }
 
+// ── GUEST: leave ─────────────────────────────────────────────────────────────
+function wtGuestLeave() {
+  wtCleanup();
+  wtHideHUD();
+  const modal = document.getElementById('wtStreamModal');
+  if (modal) modal.style.display = 'none';
+  showToast('Left the Watch Together session.');
+}
+
+// ── Cleanup ───────────────────────────────────────────────────────────────────
+function wtCleanup() {
+  if (_wtUnsubscribe) { try { _wtUnsubscribe(); } catch(e) {} _wtUnsubscribe = null; }
+  if (_wtSyncInterval) { clearInterval(_wtSyncInterval); _wtSyncInterval = null; }
+
+  // If host: remove room from Firebase
+  if (wtRoomId && wtRole === 'host') {
+    _wtRemove('watch_parties/' + wtRoomId);
+  }
+
+  // Clear guest iframe
+  const frameEl = document.getElementById('wtGuestFrame');
+  if (frameEl) frameEl.src = '';
+
+  wtRoomId = null; wtRole = null; wtItem = null;
+  wtPaused = true; wtStartTime = null; wtPauseOffset = 0;
+  _wtCachedState = null;
+}
+
+// ── Room link ─────────────────────────────────────────────────────────────────
 function wtBuildLink(roomId) {
   const url = new URL(window.location.href);
   url.searchParams.set('wtroom', roomId);
-  if (wtItem) { url.searchParams.set('id', wtItem.tmdbId); url.searchParams.set('type', wtItem.type); }
   return url.toString();
 }
 
-function wtHost() {
-  if (!currentItem) { showToast('Open a movie or series first!'); return; }
-  wtCleanup();
-  wtRoomId = wtGenId();
-  wtRole = 'host';
-  wtItem = currentItem;
-  wtPaused = true;
-  wtPauseOffset = 0;
-  wtStartTime = null;
-  _wtAttachListener(wtRoomId);
-  wtSaveState({ action: 'init', tmdbId: wtItem.tmdbId, type: wtItem.type, title: wtItem.title, paused: true, offset: 0 });
-  wtShowHUD();
-  closeWatchTogetherModal();
-  showToast('Room created! Share the link with friends.');
-}
-
-function wtJoin(roomId) {
-  wtCleanup();
-  wtRoomId = roomId;
-  wtRole = 'guest';
-  _wtAttachListener(wtRoomId);
-  // Polling is now just a safety heartbeat — Firebase listener handles real-time updates
-  wtPollInterval = setInterval(function() {
-    if (_wtCachedState) wtHandleMsg(_wtCachedState);
-  }, 3000);
-  wtShowHUD();
-}
-
-function wtPoll() {
-  const state = wtReadState();
-  if (state) wtHandleMsg(state);
-}
-
-function wtHandleMsg(msg) {
-  if (!msg || !wtRoomId) return;
-  if (msg.tmdbId && (!wtItem || String(wtItem.tmdbId) !== String(msg.tmdbId))) {
-    const found = allContent.find(i => String(i.tmdbId) === String(msg.tmdbId) && i.type === msg.type);
-    if (found) wtItem = found;
-  }
-  if (msg.action === 'play') {
-    wtPaused = false; wtStartTime = msg.startTime;
-    wtUpdateHUD();
-    if (wtRole === 'guest') wtApplySync(msg);
-  } else if (msg.action === 'pause') {
-    wtPaused = true; wtPauseOffset = msg.offset || 0;
-    wtUpdateHUD();
-    if (wtRole === 'guest') wtApplySync(msg);
-  } else if (msg.action === 'seek') {
-    wtPauseOffset = msg.offset || 0; wtStartTime = msg.startTime; wtPaused = msg.paused;
-    wtUpdateHUD();
-    if (wtRole === 'guest') wtApplySync(msg);
-  } else if (msg.action === 'init') {
-    if (wtRole === 'guest' && msg.title) {
-      const el = document.getElementById('partyCountdown');
-      const sub = document.getElementById('partySub');
-      if (el) el.textContent = msg.title;
-      if (sub) sub.textContent = 'Waiting for host...';
-    }
-  } else if (msg.action === 'end') {
-    showToast('Watch Together session ended by host.');
-    wtCleanup(); wtHideHUD();
-  }
-}
-
-function wtApplySync(msg) {
-  if (!wtItem) return;
-  let nowOffset;
-  if (msg.action === 'play' || msg.action === 'seek') {
-    nowOffset = Math.round(((msg.action === 'play' ? Date.now() - msg.startTime : msg.offset) || 0) / 1000);
-    const m = Math.floor(nowOffset/60), s = (nowOffset%60).toString().padStart(2,'0');
-    if (!document.getElementById('detailModal').classList.contains('open')) openContent(wtItem);
-    showToast('Seek to ' + m + ':' + s + ' and press play!');
-    const sub = document.getElementById('partySub');
-    if (sub) sub.textContent = 'Seek to ' + m + ':' + s;
-  } else if (msg.action === 'pause') {
-    nowOffset = Math.round((msg.offset || 0) / 1000);
-    const m = Math.floor(nowOffset/60), s = (nowOffset%60).toString().padStart(2,'0');
-    showToast('Host paused at ' + m + ':' + s);
-    const sub = document.getElementById('partySub');
-    if (sub) sub.textContent = 'Paused at ' + m + ':' + s;
-  }
-}
-
-function wtHostPlay() {
-  if (wtRole !== 'host') return;
-  wtStartTime = Date.now() - wtPauseOffset; wtPaused = false;
-  wtSaveState({ action: 'play', startTime: wtStartTime, tmdbId: wtItem.tmdbId, type: wtItem.type, title: wtItem.title });
-  wtUpdateHUD(); showToast('Told guests to press play!');
-}
-
-function wtHostPause(offset) {
-  if (wtRole !== 'host') return;
-  wtPaused = true;
-  wtPauseOffset = offset !== undefined ? offset : (wtStartTime ? Date.now() - wtStartTime : 0);
-  wtSaveState({ action: 'pause', offset: wtPauseOffset, tmdbId: wtItem && wtItem.tmdbId, type: wtItem && wtItem.type });
-  wtUpdateHUD();
-}
-
-function wtHostSeek(offsetMs) {
-  if (wtRole !== 'host') return;
-  wtPauseOffset = offsetMs;
-  wtStartTime = wtPaused ? null : Date.now() - offsetMs;
-  wtSaveState({ action: 'seek', offset: offsetMs, startTime: wtStartTime, paused: wtPaused, tmdbId: wtItem && wtItem.tmdbId, type: wtItem && wtItem.type });
-  wtUpdateHUD();
-}
-
+// ── End session (host) ────────────────────────────────────────────────────────
 function wtEndSession() {
   if (wtRole !== 'host') return;
-  wtSaveState({ action: 'end' });
-  wtCleanup(); wtHideHUD();
+  wtBroadcast('end');
+  setTimeout(function() { wtCleanup(); wtHideHUD(); }, 300);
   showToast('Watch Together session ended.');
 }
 
-function wtShowHUD() { document.getElementById('partyTimer').classList.add('visible'); wtUpdateHUD(); }
-function wtHideHUD() { document.getElementById('partyTimer').classList.remove('visible'); }
+// ── HUD ───────────────────────────────────────────────────────────────────────
+function wtShowHUD() {
+  const el = document.getElementById('partyTimer');
+  if (el) el.classList.add('visible');
+  wtUpdateHUD();
+}
+function wtHideHUD() {
+  const el = document.getElementById('partyTimer');
+  if (el) el.classList.remove('visible');
+}
+function wtUpdateHUD() {
+  const titleEl = document.getElementById('partyCountdown');
+  const subEl   = document.getElementById('partySub');
+  const actEl   = document.getElementById('partyActions');
+  if (!titleEl) return;
+  titleEl.textContent = (wtItem && wtItem.title) || 'Watch Together';
+  if (wtRole === 'host') {
+    if (subEl) subEl.textContent = 'Host \u2022 You control playback';
+    if (actEl) actEl.innerHTML =
+      '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtCopyLink()">&#128279; Copy Link</button>' +
+      '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtHostPlay()">&#9654; Play</button>' +
+      '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtHostPause()">&#9646;&#9646; Pause</button>' +
+      '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;color:var(--accent)" onclick="wtEndSession()">End</button>';
+  } else {
+    if (subEl) subEl.textContent = wtRoomId ? 'Watching \u2022 Room: ' + wtRoomId : 'Connecting\u2026';
+    if (actEl) actEl.innerHTML =
+      '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtGuestLeave()">Leave</button>';
+  }
+}
 
 function closeWatchTogether() {
   if (wtRole === 'host') {
     if (confirm('End the Watch Together session for everyone?')) wtEndSession();
-  } else { wtCleanup(); wtHideHUD(); }
+  } else { wtGuestLeave(); }
 }
 
 function wtCopyLink() {
@@ -9140,31 +9504,19 @@ function wtCopyLink() {
   } else { prompt('Copy this link:', link); }
 }
 
-function wtUpdateHUD() {
-  const titleEl = document.getElementById('partyCountdown');
-  const subEl = document.getElementById('partySub');
-  const actEl = document.getElementById('partyActions');
-  if (!titleEl) return;
-  if (!wtItem) { titleEl.textContent = 'Watch Together'; if(subEl) subEl.textContent = 'Connecting...'; return; }
-  titleEl.textContent = wtItem.title || 'Watch Together';
-  if (wtRole === 'host') {
-    if(subEl) subEl.textContent = 'Host \u2022 Room: ' + wtRoomId;
-    if(actEl) actEl.innerHTML = '<button class="btn btn-primary" style="font-size:11px;padding:5px 10px" onclick="wtHostPlay()">&#9654; Play</button><button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtHostPause()">&#9646;&#9646; Pause</button><button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtCopyLink()">&#128279; Link</button><button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;color:var(--accent)" onclick="wtEndSession()">End</button>';
-  } else {
-    if(subEl) subEl.textContent = 'Guest \u2022 Room: ' + wtRoomId;
-    if(actEl) actEl.innerHTML = '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtLeave()">Leave</button>';
-  }
-}
+function wtLeave() { wtGuestLeave(); }
+function wtApplySync() {}
+function wtPoll() {}
+function wtHostSeek() { if (wtRole === 'host') wtBroadcast(wtPaused ? 'pause' : 'play'); }
 
-function wtLeave() { wtCleanup(); wtHideHUD(); showToast('Left the Watch Together session.'); }
-
+// ── Watch Together modal UI ──────────────────────────────────────────────────
 function openWatchTogetherModal() {
   const modal = document.getElementById('watchTogetherModal');
-  const wtc = document.getElementById('wtContent');
+  const wtc   = document.getElementById('wtContent');
   if (!modal || !wtc) return;
   modal.classList.add('open');
 
-  const params = new URLSearchParams(window.location.search);
+  const params   = new URLSearchParams(window.location.search);
   const joinRoom = params.get('wtroom');
 
   if (joinRoom && !wtRoomId) {
@@ -9178,12 +9530,12 @@ function openWatchTogetherModal() {
     return;
   }
 
-  const hasItem = !!currentItem;
+  const hasItem  = !!currentItem;
   const itemHtml = hasItem
-    ? '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:20px"><img src="' + IMG + currentItem.poster + '" style="width:40px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0" onerror="this.style.opacity=.3"/><div><div style="font-family:var(--font-display);font-weight:700;font-size:.85rem;color:var(--white)">' + currentItem.title + '</div><div style="font-size:12px;color:var(--muted)">' + currentItem.year + ' \u00b7 \u2605' + currentItem.rating + '</div></div></div><button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="wtHost()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Host Watch Together</button>'
+    ? '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:20px"><img src="' + IMG + currentItem.poster + '" style="width:40px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0" onerror="this.style.opacity=.3"/><div><div style="font-family:var(--font-display);font-weight:700;font-size:.85rem;color:var(--white)">' + currentItem.title + '</div><div style="font-size:12px;color:var(--muted)">' + currentItem.year + ' \u00b7 \u2605' + currentItem.rating + '</div></div></div><button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="wtHost()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>&#127909; Host a Session</button><div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">Guests load the same video source and stay in sync automatically. No screen sharing needed — works on any device.</div>'
     : '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:14px;text-align:center;margin-bottom:16px;color:var(--muted);font-family:var(--font-display);font-size:13px">Open a movie or series first, then come back to host.</div>';
 
-  wtc.innerHTML = '<div style="margin-bottom:18px"><p style="color:var(--muted);font-size:13px;line-height:1.6;font-family:var(--font-display)">Host a session and invite friends to watch in sync. You control play and pause \u2014 guests follow your lead.</p></div>' + itemHtml + '<div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--muted);font-family:var(--font-display)">or join a room</span><div style="flex:1;height:1px;background:var(--border)"></div></div><div style="display:flex;gap:8px"><input id="wtJoinInput" type="text" placeholder="Enter room code" maxlength="6" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key===\'Enter\')wtJoinFromInput()"/><button class="btn btn-ghost" onclick="wtJoinFromInput()">Join</button></div>';
+  wtc.innerHTML = '<div style="margin-bottom:18px"><p style="color:var(--muted);font-size:13px;line-height:1.6;font-family:var(--font-display)">Everyone loads the same embed — you control play, pause, and timing. Guests follow automatically, no screen sharing required.</p></div>' + itemHtml + '<div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--muted);font-family:var(--font-display)">or join a room</span><div style="flex:1;height:1px;background:var(--border)"></div></div><div style="display:flex;gap:8px"><input id="wtJoinInput" type="text" placeholder="Enter room code" maxlength="6" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key===\'Enter\')wtJoinFromInput()"/><button class="btn btn-ghost" onclick="wtJoinFromInput()">Join</button></div>';
 }
 
 function wtJoinFromInput() {
@@ -9198,12 +9550,22 @@ function closeWatchTogetherModal() {
   if (m) m.classList.remove('open');
 }
 
-// Auto-open join modal if URL has wtroom param
+// Auto-join if URL has ?wtroom=XXXX — wait for app to be ready first
 (function wtCheckUrl() {
-  setTimeout(function() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('wtroom')) openWatchTogetherModal();
-  }, 900);
+  const params   = new URLSearchParams(window.location.search);
+  const roomCode = params.get('wtroom');
+  if (!roomCode) return;
+  function _tryAutoJoin() {
+    if (typeof allContent !== 'undefined' && allContent.length > 0) {
+      wtJoin(roomCode.toUpperCase());
+      try { history.replaceState(null, '', window.location.pathname); } catch(e) {}
+    } else {
+      setTimeout(_tryAutoJoin, 500);
+    }
+  }
+  var _checkReady = setInterval(function() {
+    if (window._svAuthReady) { clearInterval(_checkReady); _tryAutoJoin(); }
+  }, 300);
 })();
 
 // Legacy stubs
@@ -9734,6 +10096,7 @@ window.toggleParentalLock = toggleParentalLock;
 window.setPlaybackSpeed = setPlaybackSpeed;
 window.wtHost = wtHost;
 window.wtJoin = wtJoin;
+window.wtGuestLeave = wtGuestLeave;
 window.wtHostPlay = wtHostPlay;
 window.wtHostPause = wtHostPause;
 window.wtEndSession = wtEndSession;
@@ -9776,8 +10139,9 @@ if (window._svAppReadyPending) {
   window._svAppReady();
 }
 </script>
-<!-- Search results dropdown — lives in body so nav stacking context doesn't clip it -->
-<div class="search-results" id="searchResults" style="position:fixed;z-index:9000;display:none;width:280px;"></div>
+
+
+
 
 
 
