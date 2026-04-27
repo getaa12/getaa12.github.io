@@ -17,6 +17,8 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -173,3 +175,21 @@ window._fbSignUp = async (email, password, displayName) => {
 window._fbSignIn = (email, password) =>
   signInWithEmailAndPassword(auth, email, password);
 window._fbSignOut = () => signOut(auth);
+
+window._fbGoogleSignIn = async () => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  const cred = await signInWithPopup(auth, provider);
+  // Create a profile entry if this is the user's first Google sign-in
+  const existing = await window.FirebaseProfile.load(cred.user.uid);
+  if (!existing) {
+    const profile = {
+      name: cred.user.displayName || cred.user.email.split("@")[0],
+      badge: "🎬",
+      color: "#e8622a",
+      bio: "",
+    };
+    await window.FirebaseProfile.save(profile);
+  }
+  return cred.user;
+};
