@@ -8950,18 +8950,57 @@ let partySeconds = 0;
 function wtGenId() {
   return Math.random().toString(36).slice(2,8).toUpperCase();
 }
-function wtStateKey(id) { return 'wt_state_' + id; }
+// ── Watch Together: Firebase Realtime DB sync ──────────────────────────────
+// State is stored at watch_parties/{roomId} in Firebase RTDB so all devices
+// sharing the same room ID read/write the same node in real time.
+
+let _wtUnsubscribe = null;      // Firebase onValue unsubscribe handle
+let _wtCachedState = null;      // Latest state snapshot pushed by Firebase
+
+function _wtAttachListener(id) {
+  // Detach any previous listener first
+  if (_wtUnsubscribe) { try { _wtUnsubscribe(); } catch(e){} _wtUnsubscribe = null; }
+  _wtCachedState = null;
+  if (!id) return;
+  try {
+    const { getDatabase, ref, onValue } = window._firebaseRTDB;
+    _wtUnsubscribe = onValue(ref(getDatabase(), 'watch_parties/' + id), function(snap) {
+      _wtCachedState = snap.exists() ? snap.val() : null;
+      // Immediately process any incoming state change
+      if (_wtCachedState && wtRole === 'guest') wtHandleMsg(_wtCachedState);
+      if (_wtCachedState && wtRole === 'host' && _wtCachedState.action === 'end') {
+        showToast('Session ended.'); wtCleanup(); wtHideHUD();
+      }
+    }, function(err) { console.warn('[WT] listener error', err); });
+  } catch(e) { console.warn('[WT] _wtAttachListener failed', e); }
+}
+
 function wtSaveState(state) {
-  try { FirebaseDB.setItem(wtStateKey(wtRoomId), JSON.stringify({...state, ts: Date.now()})); } catch(e){}
-  if (wtChannel) try { wtChannel.postMessage({...state, ts: Date.now()}); } catch(e){}
+  if (!wtRoomId) return;
+  const payload = Object.assign({}, state, { ts: Date.now() });
+  try {
+    const { getDatabase, ref, set } = window._firebaseRTDB;
+    set(ref(getDatabase(), 'watch_parties/' + wtRoomId), payload).catch(function(e){ console.warn('[WT] write failed', e); });
+  } catch(e) { console.warn('[WT] wtSaveState error', e); }
 }
+
 function wtReadState() {
-  try { const raw = FirebaseDB.getItem(wtStateKey(wtRoomId)); return raw ? JSON.parse(raw) : null; } catch(e) { return null; }
+  // Returns the last value pushed by the Firebase listener (may be null until first snapshot arrives)
+  return _wtCachedState;
 }
+
 function wtCleanup() {
   clearInterval(wtPollInterval);
+  if (_wtUnsubscribe) { try { _wtUnsubscribe(); } catch(e){} _wtUnsubscribe = null; }
+  _wtCachedState = null;
   if (wtChannel) { try { wtChannel.close(); } catch(e){} wtChannel = null; }
-  if (wtRoomId) { try { FirebaseDB.removeItem(wtStateKey(wtRoomId)); } catch(e){} }
+  // Only the host removes the room node on cleanup
+  if (wtRoomId && wtRole === 'host') {
+    try {
+      const { getDatabase, ref, remove } = window._firebaseRTDB;
+      remove(ref(getDatabase(), 'watch_parties/' + wtRoomId)).catch(function(){});
+    } catch(e){}
+  }
   wtRoomId = null; wtRole = null; wtItem = null; wtPaused = true; wtStartTime = null; wtPauseOffset = 0;
 }
 
@@ -8981,7 +9020,7 @@ function wtHost() {
   wtPaused = true;
   wtPauseOffset = 0;
   wtStartTime = null;
-  try { wtChannel = new BroadcastChannel('wt_' + wtRoomId); wtChannel.onmessage = e => wtHandleMsg(e.data); } catch(e){}
+  _wtAttachListener(wtRoomId);
   wtSaveState({ action: 'init', tmdbId: wtItem.tmdbId, type: wtItem.type, title: wtItem.title, paused: true, offset: 0 });
   wtShowHUD();
   closeWatchTogetherModal();
@@ -8992,9 +9031,11 @@ function wtJoin(roomId) {
   wtCleanup();
   wtRoomId = roomId;
   wtRole = 'guest';
-  try { wtChannel = new BroadcastChannel('wt_' + wtRoomId); wtChannel.onmessage = e => wtHandleMsg(e.data); } catch(e){}
-  wtPollInterval = setInterval(wtPoll, 1500);
-  wtPoll();
+  _wtAttachListener(wtRoomId);
+  // Polling is now just a safety heartbeat — Firebase listener handles real-time updates
+  wtPollInterval = setInterval(function() {
+    if (_wtCachedState) wtHandleMsg(_wtCachedState);
+  }, 3000);
   wtShowHUD();
 }
 
@@ -9586,100 +9627,7 @@ function checkAchievements() {}
 function savePointsData() {}
 function tryUnlock() { return true; }
 
-// =========================================================
-// WATCH PARTY FIREBASE FIX (Realtime DB Sync)
-// Overwrites the old BroadcastChannel/localStorage mocks
-// =========================================================
-let _partyUnsubscribe = null;
-let _cachedPartyState = null;
-let _currentConnectedPartyId = null;
 
-// Helper to setup listener without blocking the synchronous read
-function _setupPartyListener(id) {
-    if (_currentConnectedPartyId === id) return;
-    
-    if (_partyUnsubscribe) {
-        _partyUnsubscribe();
-        _partyUnsubscribe = null;
-    }
-    
-    _currentConnectedPartyId = id;
-    
-    try {
-        // Use the getDatabase(), ref(), and onValue() directly since they are 
-        // already imported at the top of your module! No dynamic imports needed.
-        const db = getDatabase();
-        
-        // Listen to Firebase and update local cache instantly
-        _partyUnsubscribe = onValue(ref(db, `watch_parties/${id}`), (snapshot) => {
-            if (snapshot.exists()) {
-                _cachedPartyState = snapshot.val();
-            } else {
-                // If room exists but no state is written yet, signal waiting safely
-                _cachedPartyState = { state: "paused", timestamp: 0, waiting: true };
-            }
-        }, (error) => {
-            console.error("Watch Party Sync Error:", error);
-            _cachedPartyState = { state: "paused", timestamp: 0, error: true };
-        });
-    } catch (err) {
-        console.error("Watch Party Setup Error:", err);
-        _cachedPartyState = { state: "paused", timestamp: 0, error: true };
-    }
-}
-
-// Replaces the old local wtWriteState
-function wtWriteState(state, partyId) {
-    const id = partyId || window.currentPartyId || state?.partyId || new URLSearchParams(window.location.search).get('party');
-    if (!id) return;
-    
-    try {
-        const db = getDatabase();
-        set(ref(db, `watch_parties/${id}`), state).catch(err => {
-            console.error("Watch Party Write Error:", err);
-        });
-    } catch (err) {
-        console.error("Watch Party Write Setup Error:", err);
-    }
-}
-
-// Replaces the old local wtReadState
-function wtReadState(partyId) {
-    const id = partyId || window.currentPartyId || new URLSearchParams(window.location.search).get('party');
-    if (!id) return null;
-    
-    // Fire and forget listener setup (runs exactly once per party ID)
-    _setupPartyListener(id);
-    
-    // The existing polling loop will read from this instantly-updated cache
-    return _cachedPartyState;
-}
-
-// =========================================================
-// GLOBAL EXPOSURE FIX
-// Expose all interactive functions to the global window object
-// so that HTML inline onclick handlers can trigger them.
-// =========================================================
-window.wtWriteState = wtWriteState;
-window.wtReadState = wtReadState;
-window.playMovie = typeof playMovie !== 'undefined' ? playMovie : null;
-window.addComment = typeof addComment !== 'undefined' ? addComment : null;
-window.closeModal = typeof closeModal !== 'undefined' ? closeModal : null;
-window.toggleTheme = typeof toggleTheme !== 'undefined' ? toggleTheme : null;
-window.filterGenre = typeof filterGenre !== 'undefined' ? filterGenre : null;
-window.openMovieModal = typeof openMovieModal !== 'undefined' ? openMovieModal : null;
-window.addToWatchlist = typeof addToWatchlist !== 'undefined' ? addToWatchlist : null;
-window.toggleLike = typeof toggleLike !== 'undefined' ? toggleLike : null;
-window.rateMovie = typeof rateMovie !== 'undefined' ? rateMovie : null;
-window.showToast = typeof showToast !== 'undefined' ? showToast : null;
-window.openAuthModal = typeof openAuthModal !== 'undefined' ? openAuthModal : null;
-window.closeAuthModal = typeof closeAuthModal !== 'undefined' ? closeAuthModal : null;
-window.logout = typeof logout !== 'undefined' ? logout : null;
-window.handleSearch = typeof handleSearch !== 'undefined' ? handleSearch : null;
-window.clearSearch = typeof clearSearch !== 'undefined' ? clearSearch : null;
-window.switchTab = typeof switchTab !== 'undefined' ? switchTab : null;
-window.buyTicket = typeof buyTicket !== 'undefined' ? buyTicket : null;
-window.claimReward = typeof claimReward !== 'undefined' ? claimReward : null;
 
 /* =========================================================
    ===== APP INITIALISATION =====
