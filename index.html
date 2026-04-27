@@ -9594,15 +9594,53 @@ let _partyUnsubscribe = null;
 let _cachedPartyState = null;
 let _currentConnectedPartyId = null;
 
+// Helper to setup listener without blocking the synchronous read
+function _setupPartyListener(id) {
+    if (_currentConnectedPartyId === id) return;
+    
+    if (_partyUnsubscribe) {
+        _partyUnsubscribe();
+        _partyUnsubscribe = null;
+    }
+    
+    _currentConnectedPartyId = id;
+    
+    try {
+        // Use the getDatabase(), ref(), and onValue() directly since they are 
+        // already imported at the top of your module! No dynamic imports needed.
+        const db = getDatabase();
+        
+        // Listen to Firebase and update local cache instantly
+        _partyUnsubscribe = onValue(ref(db, `watch_parties/${id}`), (snapshot) => {
+            if (snapshot.exists()) {
+                _cachedPartyState = snapshot.val();
+            } else {
+                // If room exists but no state is written yet, signal waiting safely
+                _cachedPartyState = { state: "paused", timestamp: 0, waiting: true };
+            }
+        }, (error) => {
+            console.error("Watch Party Sync Error:", error);
+            _cachedPartyState = { state: "paused", timestamp: 0, error: true };
+        });
+    } catch (err) {
+        console.error("Watch Party Setup Error:", err);
+        _cachedPartyState = { state: "paused", timestamp: 0, error: true };
+    }
+}
+
 // Replaces the old local wtWriteState
 function wtWriteState(state, partyId) {
-    // Dynamically grab the party ID depending on how your UI currently stores it
     const id = partyId || window.currentPartyId || state?.partyId || new URLSearchParams(window.location.search).get('party');
     if (!id) return;
     
-    const db = getDatabase();
-    set(ref(db, `watch_parties/${id}`), state)
-        .catch(err => console.error("Watch Party Write Error:", err));
+    try {
+        const db = getDatabase();
+        set(ref(db, `watch_parties/${id}`), state).catch(err => {
+            console.error("Watch Party Write Error:", err);
+        });
+    } catch (err) {
+        console.error("Watch Party Write Setup Error:", err);
+    }
 }
 
 // Replaces the old local wtReadState
@@ -9610,20 +9648,8 @@ function wtReadState(partyId) {
     const id = partyId || window.currentPartyId || new URLSearchParams(window.location.search).get('party');
     if (!id) return null;
     
-    // Setup the real-time listener exactly once per party ID
-    if (_currentConnectedPartyId !== id) {
-        if (_partyUnsubscribe) _partyUnsubscribe(); // Clean up old listener if switching rooms
-        
-        _currentConnectedPartyId = id;
-        const db = getDatabase();
-        
-        // Listen to Firebase and update our local cache instantly
-        _partyUnsubscribe = onValue(ref(db, `watch_parties/${id}`), (snapshot) => {
-            _cachedPartyState = snapshot.val();
-        }, (error) => {
-            console.error("Watch Party Sync Error:", error);
-        });
-    }
+    // Fire and forget listener setup (runs exactly once per party ID)
+    _setupPartyListener(id);
     
     // The existing polling loop will read from this instantly-updated cache
     return _cachedPartyState;
@@ -9654,7 +9680,6 @@ window.clearSearch = typeof clearSearch !== 'undefined' ? clearSearch : null;
 window.switchTab = typeof switchTab !== 'undefined' ? switchTab : null;
 window.buyTicket = typeof buyTicket !== 'undefined' ? buyTicket : null;
 window.claimReward = typeof claimReward !== 'undefined' ? claimReward : null;
-
 
 /* =========================================================
    ===== APP INITIALISATION =====
