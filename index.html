@@ -910,24 +910,159 @@ function clearMobileNavSearch() {
 </div>
 
 <!-- ===== HERO ===== -->
-<div class="hero">
-  <div class="hero-bg"></div>
+<div class="hero" id="heroSection">
+  <div class="hero-bg">
+    <!-- Full-bleed TMDB backdrop, injected by JS -->
+    <img class="hero-backdrop" id="heroBackdrop" src="" alt="" aria-hidden="true" />
+    <!-- Gradient overlays for Netflix-style fade -->
+    <div class="hero-backdrop-grad"></div>
+  </div>
   <div class="hero-content">
     <div class="hero-badge"><span class="badge-dot"></span> <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="display:inline;vertical-align:middle;opacity:0.8"><rect width="10" height="10" rx="2"/></svg> Featured Today</div>
-    <h1>The <span class="hi">Ultimate</span><br/>Streaming Hub</h1>
-    <p>Watch thousands of movies and series. Earn points by viewing a quick sponsor ad to unlock premium content.</p>
+    <h1 id="heroTitle" class="hero-title-dynamic">The <span class="hi">Ultimate</span><br/>Streaming Hub</h1>
+    <p id="heroOverview">Watch thousands of movies and series. Earn points by viewing a quick sponsor ad to unlock premium content.</p>
     <div class="hero-actions">
       <button class="btn btn-primary" id="heroWatchBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg> Watch Now</button>
       <button class="btn btn-ghost" onclick="document.getElementById('sec-trending').scrollIntoView({behavior:'smooth'})">Browse All</button>
     </div>
-
-
-    <div class="hero-meta">
+    <div class="hero-meta" id="heroMeta">
       <span><span class="star">★</span> 9.2 IMDb</span>
       <span class="tag">1972</span><span class="tag">Crime · Drama</span>
     </div>
   </div>
 </div>
+
+<script>
+/* ── Netflix-style hero backdrop loader ── */
+(function initHeroBackdrop() {
+  const TMDB_KEY  = '8265bd1679663a7ea12ac168da84d2e8';
+  const BASE      = 'https://api.themoviedb.org/3';
+  const IMG_W1280 = 'https://image.tmdb.org/t/p/w1280';
+  const CACHE_KEY = 'sv_hero_backdrop_v2';
+
+  /* Try to read the featured movie from the app catalog.
+     Falls back to fetching today's top trending movie from TMDB. */
+  async function getFeaturedTmdbId() {
+    // Give app.js a moment to populate window._svFeaturedMovie
+    if (window._svFeaturedMovie && window._svFeaturedMovie.tmdbId) {
+      return { id: window._svFeaturedMovie.tmdbId, type: window._svFeaturedMovie.type || 'movie', title: window._svFeaturedMovie.title, year: window._svFeaturedMovie.year, rating: window._svFeaturedMovie.rating, genres: window._svFeaturedMovie.genres };
+    }
+    return null;
+  }
+
+  async function fetchBackdropForId(tmdbId, type) {
+    const endpoint = type === 'tv'
+      ? `${BASE}/tv/${tmdbId}?api_key=${TMDB_KEY}&language=en-US`
+      : `${BASE}/movie/${tmdbId}?api_key=${TMDB_KEY}&language=en-US`;
+    const r = await fetch(endpoint);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return {
+      backdropPath: d.backdrop_path || null,
+      overview: d.overview || '',
+      title: d.title || d.name || '',
+      year: (d.release_date || d.first_air_date || '').slice(0,4),
+      rating: d.vote_average ? d.vote_average.toFixed(1) : null,
+      genres: (d.genres || []).slice(0,2).map(g => g.name).join(' · ')
+    };
+  }
+
+  async function fetchTrendingFallback() {
+    const r = await fetch(`${BASE}/trending/movie/day?api_key=${TMDB_KEY}&language=en-US`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const m = (d.results || []).find(x => x.backdrop_path);
+    if (!m) return null;
+    return {
+      backdropPath: m.backdrop_path,
+      overview: m.overview || '',
+      title: m.title || '',
+      year: (m.release_date || '').slice(0,4),
+      rating: m.vote_average ? m.vote_average.toFixed(1) : null,
+      genres: ''
+    };
+  }
+
+  function applyBackdrop(info) {
+    if (!info || !info.backdropPath) return;
+    const img    = document.getElementById('heroBackdrop');
+    const titleEl = document.getElementById('heroTitle');
+    const overviewEl = document.getElementById('heroOverview');
+    const metaEl = document.getElementById('heroMeta');
+
+    /* preload image, then fade in */
+    const preload = new Image();
+    preload.onload = () => {
+      img.src = IMG_W1280 + info.backdropPath;
+      img.classList.add('loaded');
+    };
+    preload.src = IMG_W1280 + info.backdropPath;
+
+    /* Update hero copy if we have real movie data */
+    if (info.title) {
+      titleEl.innerHTML = info.title.replace(/([:–—])/g, '<br/>$1').replace(/<br\/>[:–—]/,'<br/>');
+      // Simpler: just set text cleanly
+      titleEl.textContent = info.title;
+      titleEl.classList.add('hero-title-film');
+    }
+    if (info.overview) {
+      overviewEl.textContent = info.overview.length > 180
+        ? info.overview.slice(0, 177) + '…'
+        : info.overview;
+    }
+    if (metaEl && (info.rating || info.year || info.genres)) {
+      metaEl.innerHTML = [
+        info.rating ? `<span><span class="star">★</span> ${info.rating} TMDB</span>` : '',
+        info.year ? `<span class="tag">${info.year}</span>` : '',
+        info.genres ? `<span class="tag">${info.genres}</span>` : ''
+      ].filter(Boolean).join('');
+    }
+  }
+
+  async function load() {
+    const today = new Date().toISOString().slice(0,10);
+    /* check session cache */
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || 'null');
+      if (cached && cached.date === today && cached.backdropPath) {
+        applyBackdrop(cached);
+        return;
+      }
+    } catch {}
+
+    try {
+      let info = null;
+      const featured = await getFeaturedTmdbId();
+      if (featured) {
+        info = await fetchBackdropForId(featured.id, featured.type);
+        /* fill from catalog if TMDB didn't return some fields */
+        if (info) {
+          info.title   = info.title   || featured.title   || '';
+          info.year    = info.year    || featured.year    || '';
+          info.genres  = info.genres  || (Array.isArray(featured.genres) ? featured.genres.slice(0,2).join(' · ') : (featured.genres || ''));
+          info.rating  = info.rating  || featured.rating  || null;
+        }
+      }
+      if (!info || !info.backdropPath) {
+        info = await fetchTrendingFallback();
+      }
+      if (info && info.backdropPath) {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...info, date: today }));
+        applyBackdrop(info);
+      }
+    } catch(e) {
+      /* silently fail — hero keeps gradient BG */
+    }
+  }
+
+  /* Run after a short delay so app.js can set _svFeaturedMovie first */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(load, 800));
+  } else {
+    setTimeout(load, 800);
+  }
+})();
+</script>
 
 <main>
   <!-- Genre Chips -->
@@ -959,6 +1094,8 @@ function clearMobileNavSearch() {
       <option value="2000">2000s</option>
       <option value="old">Classics</option>
     </select>
+
+    <button class="sort-btn quick90-btn" id="quick90Btn" onclick="toggleQuick90(this)" title="Films under 90 minutes">⚡ Under 90 min</button>
 
     <div id="libStat" style="font-family:var(--font-display); font-size:13px; color:var(--muted);"></div>
     <!-- LIST/GRID TOGGLE -->
@@ -1774,6 +1911,15 @@ function toggleCompleted() {
 ========================================== */
 let currentItem=null, currentSeason=1, currentEpisode=1;
 let currentSortMode = 'default';
+let quick90Active = false;
+
+function toggleQuick90(btn) {
+  quick90Active = !quick90Active;
+  btn.classList.toggle('active', quick90Active);
+  if (quick90Active) showToast('⚡ Showing films under 90 min');
+  else showToast('Filter cleared');
+  filterGenre(currentGenre, null);
+}
 let watchlist = JSON.parse(FirebaseDB.getItem('sv_watchlist')||'[]');
 
 function setSortMode(mode, btn) {
@@ -1944,6 +2090,24 @@ function buildCard(item) {
     }
   }
 
+  // ── Live Viewer Count (seeded random, popular titles only) ──────
+  function seededRand(seed) {
+    let s = seed % 2147483647;
+    if (s <= 0) s += 2147483646;
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  }
+  const ratingThreshold = 6.8;
+  const isPopular = parseFloat(item.rating) >= ratingThreshold;
+  let liveViewerBadgeHtml = '';
+  if (isPopular) {
+    const seed = parseInt(String(item.tmdbId).replace(/\D/g,'').slice(0,8)) || 12345;
+    // Base count: 40–600 depending on rating
+    const ratingFactor = Math.max(0, Math.min(1, (parseFloat(item.rating) - ratingThreshold) / (9.5 - ratingThreshold)));
+    const baseCount = Math.round(40 + seededRand(seed) * 560 * (0.3 + 0.7 * ratingFactor));
+    liveViewerBadgeHtml = `<div class="card-live-badge" data-base="${baseCount}" data-seed="${seed}"><span class="card-live-dot"></span><span class="card-live-num">${baseCount}</span> watching</div>`;
+  }
+
   const overlay = `
     <div class="card-overlay">
       <button class="card-play">▶</button>
@@ -1954,6 +2118,7 @@ function buildCard(item) {
     ${cardEpProgress}
     <div class="card-done-badge" style="display:${isDone?'block':'none'}">✓ DONE</div>
     ${isNew ? `<div class="card-new-badge">NEW</div>` : ''}
+    ${liveViewerBadgeHtml}
     <button class="card-wishlist ${wlActive}" id="wl-${item.type}-${item.tmdbId}" onclick="wishlistCardClick(this,event)" data-idx="${allContent.indexOf(item)}">${isInWatchlist(item)?'♥':'♡'}</button>`;
   const runtimeDisplay = item.runtime
     ? `<span class="card-runtime">⏱ ${item.runtime} min</span>`
@@ -1973,6 +2138,62 @@ function buildCard(item) {
     </div>`;
   d.insertAdjacentHTML('beforeend', overlay + body);
   d.insertBefore(img, d.firstChild);
+
+  // ── Trailer Autoplay on Hover (1.5s delay) ──────────────────────
+  let hoverTimer = null;
+  let trailerIframe = null;
+  let trailerKey = null; // cached YouTube key
+
+  async function fetchTrailerKey() {
+    if (trailerKey) return trailerKey;
+    try {
+      const type = item.type === 'tv' ? 'tv' : 'movie';
+      const res = await fetch(
+        `https://api.themoviedb.org/3/${type}/${item.tmdbId}/videos?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US`
+      );
+      const data = await res.json();
+      const vid = (data.results || []).find(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+      trailerKey = vid ? vid.key : null;
+    } catch { trailerKey = null; }
+    return trailerKey;
+  }
+
+  function injectTrailer(key) {
+    if (trailerIframe) return; // already injected
+    const wrap = document.createElement('div');
+    wrap.className = 'card-trailer-wrap';
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${key}?autoplay=1&mute=1&controls=0&loop=1&playlist=${key}&modestbranding=1&rel=0&playsinline=1`;
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.allowFullscreen = false;
+    iframe.className = 'card-trailer-iframe';
+    wrap.appendChild(iframe);
+    d.insertBefore(wrap, d.querySelector('.card-overlay'));
+    trailerIframe = wrap;
+    requestAnimationFrame(() => wrap.classList.add('visible'));
+  }
+
+  function removeTrailer() {
+    if (!trailerIframe) return;
+    trailerIframe.classList.remove('visible');
+    setTimeout(() => {
+      trailerIframe && trailerIframe.remove();
+      trailerIframe = null;
+    }, 350);
+  }
+
+  d.addEventListener('mouseenter', () => {
+    hoverTimer = setTimeout(async () => {
+      const key = await fetchTrailerKey();
+      if (key) injectTrailer(key);
+    }, 1500);
+  });
+
+  d.addEventListener('mouseleave', () => {
+    clearTimeout(hoverTimer);
+    removeTrailer();
+  });
+
   return d;
 }
 
@@ -1983,6 +2204,33 @@ function wishlistCardClick(btn, e) {
   toggleWishlist(item, btn, e);
   btn.textContent = isInWatchlist(item) ? '♥' : '♡';
 }
+
+// ── Live Viewer Count Ticker ─────────────────────────────────────
+(function initLiveViewerTicker() {
+  let tick = 0;
+  function updateAll() {
+    tick++;
+    document.querySelectorAll('.card-live-badge').forEach(badge => {
+      const base = parseInt(badge.dataset.base) || 100;
+      const seed = parseInt(badge.dataset.seed) || 1;
+      const drift = Math.sin(tick * 0.7 + seed * 0.003) * 0.03;
+      const noise = (Math.random() - 0.5) * 0.04;
+      const count = Math.max(1, Math.round(base * (1 + drift + noise)));
+      const numEl = badge.querySelector('.card-live-num');
+      if (numEl) {
+        const prev = parseInt(numEl.textContent.replace(/[,k]/g, '')) || count;
+        if (prev !== count) {
+          numEl.classList.add('card-live-num-bump');
+          setTimeout(() => numEl.classList.remove('card-live-num-bump'), 400);
+        }
+        numEl.textContent = count >= 1000
+          ? (count / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+          : count;
+      }
+    });
+  }
+  setTimeout(() => { updateAll(); setInterval(updateAll, 5500); }, 2000);
+})();
 
 function renderGrid(id, items) {
   const g = document.getElementById(id);
@@ -2508,30 +2756,20 @@ function getContinueBtn(it) {
 function playNow() {
   const movieKey = `movie_${currentItem.tmdbId}`;
   if (!checkAndUnlock(movieKey)) return;
-
-  document.getElementById('playerModal').classList.add('open');
-  document.getElementById('detailModal').classList.remove('open');
-  document.getElementById('modalTitle').textContent = currentItem.title + ' (' + currentItem.year + ')';
   saveCW(currentItem, 1, 1);
-  loadPlayer();
-  document.getElementById('epNavBar').classList.remove('visible'); // movies: no ep nav
   showMiniPlayer(currentItem, 'Movie');
   addNotif(`▶ Started watching <strong>${currentItem.title}</strong>`);
+  openFullPage();
 }
 
 function playEpisodeFromDetail(season, ep) {
   const epKey = `tv_${currentItem.tmdbId}_s${season}e${ep}`;
   if (!checkAndUnlock(epKey)) return;
-
   currentSeason = season; currentEpisode = ep;
-  document.getElementById('playerModal').classList.add('open');
-  document.getElementById('detailModal').classList.remove('open');
-  document.getElementById('modalTitle').textContent = currentItem.title + ' · S'+season+' E'+ep;
   saveCW(currentItem, season, ep);
-  loadPlayer();
-  updateEpNavBar();
   showMiniPlayer(currentItem, `S${season} E${ep}`);
   addNotif(`▶ Started watching <strong>${currentItem.title}</strong> S${season}E${ep}`);
+  openFullPage();
 }
 
 /* ── PLAYER SOURCES — ordered by least ads first ─────────────── */
@@ -2593,46 +2831,250 @@ function switchSource(idx) {
 function openFullPage() {
   const it = currentItem;
   if (!it) return;
-  const src = PLAYER_SOURCES[_currentSourceIdx];
-  const url = it.type === 'movie'
-    ? src.movie(it.tmdbId)
-    : src.tv(it.tmdbId, currentSeason, currentEpisode);
-  const title = it.type === 'movie'
-    ? it.title
-    : `${it.title} · S${String(currentSeason).padStart(2,'0')} E${String(currentEpisode).padStart(2,'0')}`;
+
+  // Serialise sources so the popup can rebuild them
+  const sourcesJson = JSON.stringify(PLAYER_SOURCES.map(s => ({
+    id: s.id, label: s.label,
+    movieTpl: s.movie('__ID__'),
+    tvTpl:    s.tv('__ID__', '__S__', '__E__')
+  })));
+
+  const isTv   = it.type === 'tv';
+  const tmdbId = it.tmdbId;
+  const season = currentSeason  || 1;
+  const ep     = currentEpisode || 1;
+  const srcIdx = _currentSourceIdx || 0;
+  const titleSafe = (it.title || '').replace(/</g,'&lt;').replace(/'/g,"\\'");
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>${title.replace(/</g,'&lt;')} — StreamVault</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+<title>${titleSafe} — StreamVault</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:system-ui,sans-serif}
-  #wrap{position:relative;width:100vw;height:100vh;display:flex;flex-direction:column}
-  #bar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);gap:10px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.07)}
-  #bar-title{color:#f0f0f5;font-size:14px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #bar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-  .bar-btn{font-size:11px;padding:5px 11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:6px;color:#aaa;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
-  .bar-btn:hover{background:rgba(255,255,255,.14);color:#fff}
-  #player{flex:1;width:100%;border:none;display:block}
+  :root{--acc:#e8622a;--bg:#0a0a0e;--bar:#111118;--muted:#888;--white:#f0f0f5}
+  html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;font-family:system-ui,sans-serif;color:var(--white)}
+
+  /* ── layout ── */
+  #wrap{display:flex;flex-direction:column;width:100vw;height:100vh}
+  #player-area{flex:1;position:relative;background:#000;overflow:hidden}
+  iframe{width:100%;height:100%;border:none;display:block}
+
+  /* ── top bar ── */
+  #top-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:8px 14px;background:var(--bar);gap:10px;flex-shrink:0;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    transition:opacity .3s;
+  }
+  #top-bar.hidden{opacity:0;pointer-events:none}
+  #bar-title{font-size:13px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  .bar-btn{
+    font-size:11px;padding:5px 11px;background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.13);border-radius:6px;
+    color:var(--muted);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;
+    transition:background .15s,color .15s;
+  }
+  .bar-btn:hover{background:rgba(255,255,255,.16);color:var(--white)}
+
+  /* ── bottom bar ── */
+  #bot-bar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+    padding:7px 14px;gap:8px;background:var(--bar);
+    border-top:1px solid rgba(255,255,255,.07);flex-shrink:0;
+    transition:opacity .3s;
+  }
+  #bot-bar.hidden{opacity:0;pointer-events:none}
+
+  /* server buttons */
+  .srv-btn{
+    font-size:11px;padding:4px 10px;background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.12);border-radius:5px;
+    color:var(--muted);cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+    white-space:nowrap;
+  }
+  .srv-btn:hover{background:rgba(255,255,255,.14);color:var(--white)}
+  .srv-btn.active{background:rgba(232,98,42,.18);border-color:var(--acc);color:var(--acc)}
+
+  /* ep nav */
+  #ep-nav{display:flex;align-items:center;gap:6px}
+  .ep-btn{
+    font-size:12px;padding:5px 12px;background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.13);border-radius:6px;
+    color:var(--white);cursor:pointer;transition:background .15s;white-space:nowrap;
+  }
+  .ep-btn:hover{background:rgba(255,255,255,.18)}
+  #ep-label{
+    font-size:12px;font-weight:700;padding:4px 12px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+    border-radius:6px;white-space:nowrap;letter-spacing:.02em;
+  }
+
+  /* fullscreen btn glow */
+  #fs-btn{color:var(--acc);border-color:rgba(232,98,42,.4)}
+  #fs-btn:hover{background:rgba(232,98,42,.18)}
+
+  /* hide-UI toggle */
+  #hide-ui-btn{margin-left:4px}
+
+  /* ── loading spinner overlay ── */
+  #loader{
+    position:absolute;inset:0;background:#000;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    z-index:10;pointer-events:none;
+    transition:opacity .4s;
+  }
+  #loader.gone{opacity:0}
+  .spin{width:40px;height:40px;border:3px solid rgba(232,98,42,.25);border-top-color:var(--acc);border-radius:50%;animation:spin .85s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loader-txt{font-size:13px;color:rgba(255,255,255,.5);letter-spacing:.03em}
 <\/style>
 <\/head>
 <body>
 <div id="wrap">
-  <div id="bar">
-    <div id="bar-title">${title.replace(/</g,'&lt;')}</div>
-    <div id="bar-right">
+
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <div id="bar-title">Loading…<\/div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="bar-btn" id="fs-btn" onclick="goFS()" title="Enter fullscreen">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/><\/svg>
+        Fullscreen
+      </button>
+      <button class="bar-btn" id="hide-ui-btn" onclick="toggleUI()" title="Hide controls">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><\/svg>
+        Hide UI
+      </button>
       <button class="bar-btn" onclick="window.close()" title="Close">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/><\/svg>
         Close
       </button>
     </div>
   </div>
-  <iframe id="player" src="${url}" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture"><\/iframe>
-</div>
+
+  <!-- PLAYER -->
+  <div id="player-area">
+    <div id="loader">
+      <div class="spin"><\/div>
+      <div id="loader-txt">Loading content…<\/div>
+    </div>
+    <iframe id="player" src="" allowfullscreen
+      allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+      referrerpolicy="no-referrer"
+      onload="iframeLoaded()"><\/iframe>
+  <\/div>
+
+  <!-- BOTTOM BAR -->
+  <div id="bot-bar">
+    <!-- Server switcher -->
+    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap">Server:<\/span>
+      <div id="srv-btns"><\/div>
+    <\/div>
+    <!-- Episode nav (TV only) -->
+    <div id="ep-nav" style="display:none">
+      <button class="ep-btn" onclick="changeEp(-1)">◀ Prev Ep<\/button>
+      <div id="ep-label">S1 E1<\/div>
+      <button class="ep-btn" onclick="changeEp(1)">Next Ep ▶<\/button>
+    <\/div>
+  <\/div>
+
+<\/div>
+
+<script>
+(function(){
+  const SOURCES = ${sourcesJson};
+  const IS_TV   = ${isTv ? 'true' : 'false'};
+  const TMDB_ID = '${tmdbId}';
+  const TITLE   = '${titleSafe}';
+
+  let season  = ${season};
+  let ep      = ${ep};
+  let srcIdx  = ${srcIdx};
+  let uiVisible = true;
+
+  function buildUrl(si, s, e) {
+    const src = SOURCES[si];
+    if (!IS_TV) {
+      return src.movieTpl.replace('__ID__', TMDB_ID);
+    }
+    return src.tvTpl
+      .replace('__ID__', TMDB_ID)
+      .replace('__S__', s)
+      .replace('__E__', e);
+  }
+
+  function getTitle(s, e) {
+    if (!IS_TV) return TITLE + ' — StreamVault';
+    return TITLE + ' · S' + String(s).padStart(2,'0') + ' E' + String(e).padStart(2,'0') + ' — StreamVault';
+  }
+
+  function getBarTitle(s, e) {
+    if (!IS_TV) return TITLE;
+    return TITLE + ' · S' + s + ' E' + e;
+  }
+
+  function load(si, s, e) {
+    srcIdx = si; season = s; ep = e;
+    const url = buildUrl(si, s, e);
+    document.getElementById('loader').classList.remove('gone');
+    document.getElementById('player').src = url;
+    document.title = getTitle(s, e);
+    document.getElementById('bar-title').textContent = getBarTitle(s, e);
+    if (IS_TV) document.getElementById('ep-label').textContent = 'S'+s+' E'+e;
+    // Update server buttons
+    document.querySelectorAll('.srv-btn').forEach((b, i) => b.classList.toggle('active', i === si));
+  }
+
+  window.iframeLoaded = function() {
+    setTimeout(() => document.getElementById('loader').classList.add('gone'), 600);
+  };
+
+  window.changeEp = function(dir) {
+    load(srcIdx, season, Math.max(1, ep + dir));
+  };
+
+  window.goFS = function() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  };
+
+  window.toggleUI = function() {
+    uiVisible = !uiVisible;
+    document.getElementById('top-bar').classList.toggle('hidden', !uiVisible);
+    document.getElementById('bot-bar').classList.toggle('hidden', !uiVisible);
+    document.getElementById('hide-ui-btn').querySelector('svg').style.opacity = uiVisible ? '1' : '0.4';
+  };
+
+  // Build server buttons
+  const srvWrap = document.getElementById('srv-btns');
+  SOURCES.forEach((src, i) => {
+    const b = document.createElement('button');
+    b.className = 'srv-btn' + (i === srcIdx ? ' active' : '');
+    b.textContent = src.label;
+    b.onclick = () => load(i, season, ep);
+    srvWrap.appendChild(b);
+  });
+
+  // Show ep nav for TV
+  if (IS_TV) document.getElementById('ep-nav').style.display = 'flex';
+
+  // Auto-enter fullscreen on load
+  document.addEventListener('click', function tryFS() {
+    document.removeEventListener('click', tryFS);
+    goFS();
+  }, {once: true});
+
+  // Initial load
+  load(srcIdx, season, ep);
+})();
+<\/script>
 <\/body>
 <\/html>`;
+
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
   window.open(blobUrl, '_blank', 'noopener');
@@ -2873,6 +3315,9 @@ function filterGenre(genre, chip) {
   // Apply mood filter
   const moodGenres = MOOD_GENRES[currentMood];
   if(moodGenres) base = base.filter(i => i.genres && i.genres.some(g => moodGenres.includes(g)));
+
+  // Apply Under 90 min filter (movies only — tv shows have no runtime in same way)
+  if(quick90Active) base = base.filter(i => i.type === 'tv' || (i.runtime && parseInt(i.runtime) < 90));
 
   let fm = genre==='All' ? base.filter(i=>i.type==='movie') : base.filter(i=>i.type==='movie' && i.genres.includes(genre));
   let fs = genre==='All' ? base.filter(i=>i.type==='tv') : base.filter(i=>i.type==='tv' && i.genres.includes(genre));
@@ -3273,14 +3718,7 @@ document.addEventListener('DOMContentLoaded', () => {
     libStat.innerHTML = `📚 <strong style="color:var(--white)">${uniqueMovies}</strong> Movies &nbsp;·&nbsp; <strong style="color:var(--white)">${uniqueSeries}</strong> Series`;
   }
 
-  // Check for shared direct links (Deep Linking)
-  const params = new URLSearchParams(window.location.search);
-  const sharedId = params.get('id');
-  const sharedType = params.get('type');
-  if (sharedId && sharedType) {
-    const sharedItem = allContent.find(i => String(i.tmdbId) === sharedId && i.type === sharedType);
-    if (sharedItem) setTimeout(() => openContent(sharedItem), 400);
-  }
+  // Deep-link handling moved into _svAppReady (after allContent is populated)
 });
 
 /* =====================================================
@@ -4580,6 +5018,18 @@ window._loadCatalog().then(({ movies, series }) => {
   initProfile();
 
   showToast('☁️ ' + allContent.length + ' titles loaded');
+
+  // ── Deep-link: open shared movie/series from URL params ──
+  // Must run here, after allContent is populated.
+  (function handleSharedDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    const sharedId   = params.get('id');
+    const sharedType = params.get('type');
+    if (sharedId && sharedType) {
+      const sharedItem = allContent.find(i => String(i.tmdbId) === sharedId && i.type === sharedType);
+      if (sharedItem) setTimeout(() => openContent(sharedItem), 400);
+    }
+  })();
 }).catch(() => {
   // Graceful fallback: catalog empty but UI still boots
   filterGenre('All', null);
@@ -5129,6 +5579,167 @@ window.WC = WC;
   setTimeout(run, 3000);
 })();
 
+// ═══════════════════════════════════════════════════════════════
+//  🔔 WATCHLIST RELEASE ALERTS
+//  Checks TMDB once per day for each item in the user's watchlist:
+//  • TV shows  → new season or new episode aired recently
+//  • Movies    → upcoming release date set or now released
+//  Fires addNotif() for any updates not yet seen.
+// ═══════════════════════════════════════════════════════════════
+(function initWatchlistReleaseAlerts() {
+  const TMDB_KEY   = '8265bd1679663a7ea12ac168da84d2e8';
+  const BASE       = 'https://api.themoviedb.org/3';
+  const SEEN_KEY   = 'sv_wl_alert_seen';   // set of "type_id_descriptor" already notified
+  const CHECK_KEY  = 'sv_wl_alert_check';  // last check timestamp
+  const ONE_DAY    = 24 * 60 * 60 * 1000;
+
+  // Throttle: once per day per session
+  const lastCheck = parseInt(FirebaseDB.getItem(CHECK_KEY) || '0', 10);
+  if (Date.now() - lastCheck < ONE_DAY) return;
+
+  // Collect all watchlisted items (multi-tab + legacy)
+  function getWatchlistItems() {
+    try {
+      const mwl = JSON.parse(FirebaseDB.getItem('sv_mwl') || '{"want":[],"watching":[],"done":[]}');
+      const all = [...(mwl.want||[]), ...(mwl.watching||[]), ...(mwl.done||[])];
+      // Deduplicate
+      const seen = new Set();
+      return all.filter(i => {
+        const k = i.type + '_' + i.tmdbId;
+        if (seen.has(k)) return false;
+        seen.add(k); return true;
+      });
+    } catch { return []; }
+  }
+
+  async function fetchJSON(url) {
+    try {
+      const r = await fetch(url);
+      return r.ok ? r.json() : null;
+    } catch { return null; }
+  }
+
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function daysAgo(n) { return new Date(Date.now() - n * 24*60*60*1000).toISOString().slice(0,10); }
+  function daysAhead(n) { return new Date(Date.now() + n * 24*60*60*1000).toISOString().slice(0,10); }
+
+  async function checkTVShow(item, seenIds) {
+    const data = await fetchJSON(`${BASE}/tv/${item.tmdbId}?api_key=${TMDB_KEY}&language=en-US`);
+    if (!data) return [];
+    const alerts = [];
+
+    // New season dropped
+    const seasons = data.number_of_seasons || 0;
+    const knownSeasons = parseInt(FirebaseDB.getItem('sv_wl_seasons_' + item.tmdbId) || '0');
+    if (seasons > knownSeasons && knownSeasons > 0) {
+      const alertKey = `tv_${item.tmdbId}_season${seasons}`;
+      if (!seenIds.has(alertKey)) {
+        alerts.push({
+          key: alertKey,
+          html: `🎉 <strong>${item.title}</strong> — Season ${seasons} is now available!`
+        });
+      }
+    }
+    // Always persist current season count
+    FirebaseDB.setItem('sv_wl_seasons_' + item.tmdbId, String(seasons));
+
+    // Next episode airing soon (within 7 days)
+    if (data.next_episode_to_air) {
+      const ep = data.next_episode_to_air;
+      const airDate = ep.air_date || '';
+      const alertKey = `tv_${item.tmdbId}_ep_${ep.season_number}_${ep.episode_number}`;
+      if (airDate >= todayStr() && airDate <= daysAhead(7) && !seenIds.has(alertKey)) {
+        alerts.push({
+          key: alertKey,
+          html: `📅 <strong>${item.title}</strong> — S${ep.season_number}E${ep.episode_number} airs on ${airDate}`
+        });
+      }
+    }
+
+    // Last episode aired recently (within 3 days)
+    if (data.last_episode_to_air) {
+      const ep = data.last_episode_to_air;
+      const airDate = ep.air_date || '';
+      const alertKey = `tv_${item.tmdbId}_aired_${ep.season_number}_${ep.episode_number}`;
+      if (airDate >= daysAgo(3) && airDate <= todayStr() && !seenIds.has(alertKey)) {
+        alerts.push({
+          key: alertKey,
+          html: `📺 <strong>${item.title}</strong> — S${ep.season_number}E${ep.episode_number} just aired!`
+        });
+      }
+    }
+
+    return alerts;
+  }
+
+  async function checkMovie(item, seenIds) {
+    const data = await fetchJSON(`${BASE}/movie/${item.tmdbId}?api_key=${TMDB_KEY}&language=en-US`);
+    if (!data) return [];
+    const alerts = [];
+    const releaseDate = data.release_date || '';
+
+    // Coming out very soon (within 7 days)
+    if (releaseDate >= todayStr() && releaseDate <= daysAhead(7)) {
+      const alertKey = `movie_${item.tmdbId}_soon`;
+      if (!seenIds.has(alertKey)) {
+        alerts.push({
+          key: alertKey,
+          html: `🎬 <strong>${item.title}</strong> — releasing on ${releaseDate}! It's in your watchlist.`
+        });
+      }
+    }
+
+    // Just released (within 3 days)
+    if (releaseDate >= daysAgo(3) && releaseDate < todayStr()) {
+      const alertKey = `movie_${item.tmdbId}_released`;
+      if (!seenIds.has(alertKey)) {
+        alerts.push({
+          key: alertKey,
+          html: `🍿 <strong>${item.title}</strong> just released (${releaseDate}) — it's in your watchlist!`
+        });
+      }
+    }
+
+    return alerts;
+  }
+
+  async function run() {
+    const items = getWatchlistItems();
+    if (!items.length) return;
+
+    let seenIds;
+    try { seenIds = new Set(JSON.parse(FirebaseDB.getItem(SEEN_KEY) || '[]')); }
+    catch { seenIds = new Set(); }
+
+    const allAlerts = [];
+
+    // Check in batches of 5 to avoid rate-limiting
+    for (let i = 0; i < items.length; i += 5) {
+      const batch = items.slice(i, i + 5);
+      const results = await Promise.all(batch.map(item =>
+        item.type === 'tv' ? checkTVShow(item, seenIds) : checkMovie(item, seenIds)
+      ));
+      results.forEach(r => allAlerts.push(...r));
+      // Small pause between batches
+      if (i + 5 < items.length) await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Fire notifications (max 5 to avoid flooding)
+    allAlerts.slice(0, 5).forEach(alert => {
+      addNotif(alert.html);
+      seenIds.add(alert.key);
+    });
+
+    // Persist seen keys (cap at 500)
+    const seenArr = [...seenIds].slice(-500);
+    FirebaseDB.setItem(SEEN_KEY, JSON.stringify(seenArr));
+    FirebaseDB.setItem(CHECK_KEY, String(Date.now()));
+  }
+
+  // Run 4 seconds after app boot so catalog + watchlist are loaded
+  setTimeout(run, 4000);
+})();
+
 }; // end _svAppReady
 
 // If hydration already finished before this script ran, call immediately
@@ -5160,5 +5771,6 @@ if (window._svAppReadyPending) {
 </div>
 
 </div><!-- #appRoot -->
+<!-- Poster strip removed — hero now uses full-bleed TMDB backdrop (see hero script above) -->
 </body>
 </html>
