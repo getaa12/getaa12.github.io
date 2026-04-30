@@ -2504,6 +2504,16 @@ function getContinueBtn(it) {
   return `<button class="btn btn-primary" onclick="playEpisodeFromDetail(${season},${ep})">${playLabel}</button>`;
 }
 
+/* ===== WATCH TIME TRACKING ===== */
+let _watchStartTime = null;
+function _startWatchTracking() { _watchStartTime = Date.now(); }
+function _stopWatchTracking() {
+  if (!_watchStartTime) return;
+  const seconds = Math.floor((Date.now() - _watchStartTime) / 1000);
+  _watchStartTime = null;
+  if (seconds > 5 && window.FirebaseLeaderboard) FirebaseLeaderboard.addTime(seconds);
+}
+
 /* ===== PLAY FUNCTIONS ===== */
 function playNow() {
   const movieKey = `movie_${currentItem.tmdbId}`;
@@ -2517,6 +2527,7 @@ function playNow() {
   document.getElementById('epNavBar').classList.remove('visible'); // movies: no ep nav
   showMiniPlayer(currentItem, 'Movie');
   addNotif(`▶ Started watching <strong>${currentItem.title}</strong>`);
+  _startWatchTracking();
 }
 
 function playEpisodeFromDetail(season, ep) {
@@ -2654,6 +2665,7 @@ function closePlayer() {
 }
 
 function closeAll() {
+  _stopWatchTracking();
   document.getElementById('playerFrame').src = '';
   document.getElementById('playerModal').classList.remove('open');
   document.getElementById('detailModal').classList.remove('open');
@@ -4513,12 +4525,11 @@ function openLeaderboard() {
     const retry = setInterval(() => {
       if (window.FirebaseLeaderboard) {
         clearInterval(retry);
-        _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 50);
-      }
+        _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 500);      }
     }, 300);
     return;
   }
-  _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 50);
+  _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 500);
 }
 
 function closeLeaderboard() {
