@@ -2504,16 +2504,6 @@ function getContinueBtn(it) {
   return `<button class="btn btn-primary" onclick="playEpisodeFromDetail(${season},${ep})">${playLabel}</button>`;
 }
 
-/* ===== WATCH TIME TRACKING ===== */
-let _watchStartTime = null;
-function _startWatchTracking() { _watchStartTime = Date.now(); }
-function _stopWatchTracking() {
-  if (!_watchStartTime) return;
-  const seconds = Math.floor((Date.now() - _watchStartTime) / 1000);
-  _watchStartTime = null;
-  if (seconds > 5 && window.FirebaseLeaderboard) FirebaseLeaderboard.addTime(seconds);
-}
-
 /* ===== PLAY FUNCTIONS ===== */
 function playNow() {
   const movieKey = `movie_${currentItem.tmdbId}`;
@@ -2527,7 +2517,6 @@ function playNow() {
   document.getElementById('epNavBar').classList.remove('visible'); // movies: no ep nav
   showMiniPlayer(currentItem, 'Movie');
   addNotif(`▶ Started watching <strong>${currentItem.title}</strong>`);
-  _startWatchTracking();
 }
 
 function playEpisodeFromDetail(season, ep) {
@@ -2665,7 +2654,6 @@ function closePlayer() {
 }
 
 function closeAll() {
-  _stopWatchTracking();
   document.getElementById('playerFrame').src = '';
   document.getElementById('playerModal').classList.remove('open');
   document.getElementById('detailModal').classList.remove('open');
@@ -4525,11 +4513,12 @@ function openLeaderboard() {
     const retry = setInterval(() => {
       if (window.FirebaseLeaderboard) {
         clearInterval(retry);
-        _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 500);      }
+        _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 50);
+      }
     }, 300);
     return;
   }
-  _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 500);
+  _lbUnlisten = window.FirebaseLeaderboard.listen((data) => { _lbAllData = data; _lbRenderList(data); }, 50);
 }
 
 function closeLeaderboard() {
@@ -5033,6 +5022,112 @@ setTimeout(() => WC.init(), 800);
 
 /* ── expose for window globals ── */
 window.WC = WC;
+
+// ═══════════════════════════════════════════════════════════════
+//  RELEASE NOTIFICATIONS — checks TMDB daily for new content
+// ═══════════════════════════════════════════════════════════════
+(function initReleaseNotifs() {
+  const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
+  const BASE     = 'https://api.themoviedb.org/3';
+  const STORE_KEY = 'sv_release_notifs_seen';
+  const CHECK_KEY = 'sv_release_notifs_lastcheck';
+
+  // Only check once per day
+  const lastCheck = parseInt(FirebaseDB.getItem(CHECK_KEY) || '0', 10);
+  const now = Date.now();
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  if (now - lastCheck < ONE_DAY) return;
+
+  // Load already-seen IDs so we don't notify twice
+  let seenIds = new Set(JSON.parse(FirebaseDB.getItem(STORE_KEY) || '[]'));
+
+  async function fetchJSON(url) {
+    try {
+      const r = await fetch(url);
+      return r.ok ? r.json() : null;
+    } catch { return null; }
+  }
+
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function weekAgoStr() {
+    const d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function checkNewMoviesInTheaters() {
+    const data = await fetchJSON(
+      `${BASE}/movie/now_playing?api_key=${TMDB_KEY}&language=en-US&page=1`
+    );
+    if (!data?.results) return [];
+    return data.results
+      .filter(m => !seenIds.has('movie_' + m.id))
+      .slice(0, 3)
+      .map(m => ({
+        id: 'movie_' + m.id,
+        html: `🎬 Now in theaters: <strong>${m.title}</strong> (${(m.release_date||'').slice(0,4)})`
+      }));
+  }
+
+  async function checkNewMoviesStreaming() {
+    const data = await fetchJSON(
+      `${BASE}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=primary_release_date.desc` +
+      `&primary_release_date.gte=${weekAgoStr()}&primary_release_date.lte=${todayStr()}&page=1`
+    );
+    if (!data?.results) return [];
+    return data.results
+      .filter(m => !seenIds.has('stream_movie_' + m.id))
+      .slice(0, 3)
+      .map(m => ({
+        id: 'stream_movie_' + m.id,
+        html: `🍿 New on streaming: <strong>${m.title}</strong> (${(m.release_date||'').slice(0,4)})`
+      }));
+  }
+
+  async function checkNewTVEpisodes() {
+    const data = await fetchJSON(
+      `${BASE}/tv/on_the_air?api_key=${TMDB_KEY}&language=en-US&page=1`
+    );
+    if (!data?.results) return [];
+    return data.results
+      .filter(t => !seenIds.has('tv_' + t.id))
+      .slice(0, 3)
+      .map(t => ({
+        id: 'tv_' + t.id,
+        html: `📺 New episodes airing: <strong>${t.name}</strong>`
+      }));
+  }
+
+  async function run() {
+    const [theaters, streaming, tv] = await Promise.all([
+      checkNewMoviesInTheaters(),
+      checkNewMoviesStreaming(),
+      checkNewTVEpisodes()
+    ]);
+
+    const allNew = [...theaters, ...streaming, ...tv];
+    if (!allNew.length) {
+      FirebaseDB.setItem(CHECK_KEY, String(now));
+      return;
+    }
+
+    // Add notifications — max 5 total to avoid flooding
+    allNew.slice(0, 5).forEach(item => {
+      addNotif(item.html);
+      seenIds.add(item.id);
+    });
+
+    // Persist seen IDs (keep last 200 to avoid bloat)
+    const seenArr = [...seenIds].slice(-200);
+    FirebaseDB.setItem(STORE_KEY, JSON.stringify(seenArr));
+    FirebaseDB.setItem(CHECK_KEY, String(now));
+  }
+
+  // Run after a short delay so the app is fully loaded
+  setTimeout(run, 3000);
+})();
 
 }; // end _svAppReady
 
