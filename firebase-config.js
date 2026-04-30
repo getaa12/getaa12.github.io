@@ -22,12 +22,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-  databaseURL: import.meta.env.VITE_DATABASE_URL,
-  projectId: import.meta.env.VITE_PROJECT_ID,
-  appId: import.meta.env.VITE_APP_ID,
-  measurementId: import.meta.env.VITE_MEASUREMENT_ID,
+  apiKey: "AIzaSyBInh8HXbwHLjwTwqEbS_QIN1KzvdZiMDE",
+  authDomain: "movies-5967a.firebaseapp.com",
+  databaseURL: "https://movies-5967a-default-rtdb.firebaseio.com",
+  projectId: "movies-5967a",
+  appId: "1:265655431989:web:1aeb61a5474b4dfb20527c",
+  measurementId: "G-DW8Q9795JY",
 };
 
 const app = initializeApp(firebaseConfig);
