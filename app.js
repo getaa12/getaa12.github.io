@@ -1,49 +1,3 @@
-/* ═══════════════════════════════════════════════════════
-   GUEST MODE  —  allow browsing without an account
-   Sets window.SV_GUEST = true, hides auth screen,
-   shows the persistent guest banner, and intercepts
-   any "save" action with a friendly sign-in prompt.
-═══════════════════════════════════════════════════════ */
-window.SV_GUEST = false;
-
-window.doGuestContinue = function () {
-  window.SV_GUEST = true;
-
-  // Hide the auth screen
-  var authScreen = document.getElementById('authScreen');
-  if (authScreen) authScreen.style.display = 'none';
-
-  // Show persistent guest banner at the bottom
-  var banner = document.getElementById('guestBanner');
-  if (banner) banner.classList.add('visible');
-
-  // Show the main app if it's hidden (some builds hide #appRoot until auth)
-  var appRoot = document.getElementById('appRoot');
-  if (appRoot && appRoot.style.display === 'none') {
-    appRoot.style.display = '';
-  }
-};
-
-/* Guest-safe wrapper: call this for any action that requires saving.
-   Shows a toast asking the user to sign in instead of silently failing. */
-window._requireAuth = function (actionLabel) {
-  if (!window.SV_GUEST) return false; // not a guest — proceed normally
-  // Show a toast / inline prompt
-  var msg = '🔒 ' + (actionLabel || 'This feature') + ' requires an account. Sign in to save your progress!';
-  if (typeof showToast === 'function') {
-    showToast(msg);
-  } else {
-    // Fallback: flash the guest banner
-    var banner = document.getElementById('guestBanner');
-    if (banner) {
-      banner.classList.add('visible');
-      banner.style.borderTopColor = '#e8622a';
-      setTimeout(function () { banner.style.borderTopColor = ''; }, 1500);
-    }
-  }
-  return true; // means "blocked — user is guest"
-};
-
 // ── Global stubs: keep onclick handlers safe before Firebase auth is ready ──
 // The real implementations are defined inside _svAppReady() and will
 // overwrite these automatically once the user is authenticated.
@@ -148,35 +102,6 @@ window._requireAuth = function (actionLabel) {
       window[name] = noop;
     }
   });
-
-  // ── Guest interceptions: override specific stubs so guests see a prompt ──
-  var guestBlockedActions = {
-    toggleWatchlist:          'Adding to watchlist',
-    toggleCompleted:          'Marking as watched',
-    setUserRating:            'Rating titles',
-    saveProfile:              'Saving your profile',
-    moveWlItem:               'Managing your watchlist',
-    removeFromMultiWl:        'Managing your watchlist',
-    toggleWishlistDetail:     'Managing your watchlist',
-    clearAllCW:               'Continue watching history',
-    removeCW:                 'Continue watching history',
-    snapCurrentContent:       'Saving a snapshot',
-    toggleReaction:           'Reacting to content',
-    submitComment:            'Posting comments',
-    deleteComment:            'Deleting comments',
-    setWatchGoal:             'Setting watch goals',
-    openWatchTogetherModal:   'Watch Together sessions',
-  };
-
-  Object.keys(guestBlockedActions).forEach(function (name) {
-    (function (n, label) {
-      var original = window[n]; // may be noop or already set
-      window[n] = function () {
-        if (window._requireAuth(label)) return;
-        if (typeof original === 'function') original.apply(this, arguments);
-      };
-    })(name, guestBlockedActions[name]);
-  });
   // checkAndUnlock must return true to allow play
   window.checkAndUnlock = function () {
     return true;
@@ -259,12 +184,14 @@ window._requireAuth = function (actionLabel) {
 
   /* ── helpers ── */
   function getWatched() {
-    // Try to pull from FirebaseDB or localStorage-like store
+    // sv_completed is stored as an object { tmdbId: true, ... } by the main app
     try {
       const raw = window.FirebaseDB
-        ? window.FirebaseDB.getItem("completed") || "[]"
-        : localStorage.getItem("sv_completed") || "[]";
-      return JSON.parse(raw);
+        ? window.FirebaseDB.getItem("sv_completed") || "{}"
+        : localStorage.getItem("sv_completed") || "{}";
+      const parsed = JSON.parse(raw);
+      // If it came back as an array (legacy), return as-is; otherwise return keys
+      return Array.isArray(parsed) ? parsed : Object.keys(parsed);
     } catch {
       return [];
     }
@@ -322,9 +249,30 @@ window._requireAuth = function (actionLabel) {
 
   function analyzeWatchData() {
     const catalog = getCatalog();
-    const completed = getWatched();
-    const watchlist = getWatchlistItems();
-    const ratings = getRatings();
+
+    // Prefer live in-memory data (same source the profile modal uses)
+    let completed, watchlist, ratings;
+
+    if (window.multiWatchlist) {
+      // multiWatchlist.done = watched items (objects with id/tmdbId)
+      completed = (window.multiWatchlist.done || []).map(
+        (w) => w.id || w.tmdbId || w,
+      );
+      watchlist = [
+        ...(window.multiWatchlist.want || []),
+        ...(window.multiWatchlist.watching || []),
+        ...(window.multiWatchlist.done || []),
+      ];
+    } else {
+      completed = getWatched();
+      watchlist = getWatchlistItems();
+    }
+
+    if (window.userRatings) {
+      ratings = window.userRatings;
+    } else {
+      ratings = getRatings();
+    }
 
     // Merge all known IDs
     const allIds = new Set([...completed, ...watchlist.map((w) => w.id || w)]);
@@ -395,10 +343,30 @@ window._requireAuth = function (actionLabel) {
       else decadeCount["20s"]++;
     });
 
-    // Estimate hours (avg 100 min per title)
-    const estHours = Math.round((watchedCount * 100) / 60);
+    // Estimate hours — use real tracked time if available, else flat estimate
+    const realMinutes =
+      typeof window._wtTotalMinutes === "function"
+        ? window._wtTotalMinutes()
+        : 0;
+    const estHours =
+      realMinutes > 0
+        ? Math.round(realMinutes / 60)
+        : Math.round((watchedCount * 100) / 60);
 
-    return { watchedCount, ratedCount, topGenres, decadeCount, estHours };
+    // Use real unique-title count from tracker if available and higher
+    const trackedTitles =
+      typeof window._wtUniqueTitles === "function"
+        ? window._wtUniqueTitles()
+        : 0;
+    const finalWatchedCount = Math.max(watchedCount, trackedTitles);
+
+    return {
+      watchedCount: finalWatchedCount,
+      ratedCount,
+      topGenres,
+      decadeCount,
+      estHours,
+    };
   }
 
   function buildDecadeRow(decadeCount) {
@@ -527,10 +495,15 @@ window._requireAuth = function (actionLabel) {
 
   function watchlist_fallback() {
     try {
+      // Also check multiWatchlist.done which is the primary "watched" store
+      if (window.multiWatchlist && window.multiWatchlist.done) {
+        return window.multiWatchlist.done.length;
+      }
       const raw = window.FirebaseDB
-        ? window.FirebaseDB.getItem("watchlist") || "[]"
-        : localStorage.getItem("sv_watchlist") || "[]";
-      return JSON.parse(raw).length;
+        ? window.FirebaseDB.getItem("sv_mwl") || "{}"
+        : localStorage.getItem("sv_mwl") || "{}";
+      const mwl = JSON.parse(raw);
+      return (mwl.done && mwl.done.length) || 0;
     } catch {
       return 0;
     }

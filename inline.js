@@ -980,8 +980,31 @@ window._svAppReady = function () {
   function shareContent() {
     if (!currentItem) return;
     const baseUrl = window.location.origin + window.location.pathname;
-    const shareUrl = `${baseUrl}?type=${currentItem.type}&id=${currentItem.tmdbId}`;
-    const text = `Watching ${currentItem.title} on StreamVault!`;
+    const sharer = FirebaseDB.getItem("sv_username") || "";
+    const shareUrl = `${baseUrl}?type=${currentItem.type}&id=${currentItem.tmdbId}${sharer ? "&from=" + encodeURIComponent(sharer) : ""}`;
+    const text = `Check out ${currentItem.title} on StreamVault!`;
+
+    // Update OG meta so link previews show the movie poster + title
+    const poster = currentItem.poster
+      ? `https://image.tmdb.org/t/p/w780${currentItem.poster}`
+      : "";
+    const setMeta = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.setAttribute("content", val);
+    };
+    setMeta("og-title", currentItem.title + " — StreamVault");
+    setMeta(
+      "og-description",
+      currentItem.overview ? currentItem.overview.slice(0, 150) + "…" : text,
+    );
+    setMeta("og-image", poster);
+    setMeta("og-url", shareUrl);
+    setMeta("tw-title", currentItem.title + " on StreamVault");
+    setMeta(
+      "tw-description",
+      currentItem.overview ? currentItem.overview.slice(0, 150) + "…" : text,
+    );
+    setMeta("tw-image", poster);
 
     // Use native Web Share API if available (mobile browsers)
     if (navigator.share) {
@@ -997,7 +1020,6 @@ window._svAppReady = function () {
           addNotif(`🔗 Shared <strong>${currentItem.title}</strong>`);
         })
         .catch((err) => {
-          // User cancelled — not an error worth toasting
           if (err.name !== "AbortError") showToast("Could not share.");
         });
       return;
@@ -1014,7 +1036,6 @@ window._svAppReady = function () {
           addNotif(`🔗 Shared <strong>${currentItem.title}</strong>`);
         })
         .catch(() => {
-          // Last resort: prompt
           prompt("Copy this link to share:", shareUrl);
         });
     } else {
@@ -2056,10 +2077,115 @@ window._svAppReady = function () {
     return `<button class="btn btn-primary" onclick="playEpisodeFromDetail(${season},${ep})">${playLabel}</button>`;
   }
 
+  /* ═══════════════════════════════════════════════════════════════
+     WATCH TIME TRACKER
+     Records real wall-clock time the player is open per session.
+     Storage key: "wt_{type}_{tmdbId}_{timestamp}"
+     Record shape: { tmdbId, type, title, poster, season, ep,
+                     startedAt, endedAt, durationMs, durationMin }
+  ═══════════════════════════════════════════════════════════════ */
+  let _wtSession = null; // active session
+
+  function _wtStart(item, season, ep) {
+    // End any lingering session first
+    _wtEnd();
+    _wtSession = {
+      tmdbId: item.tmdbId,
+      type: item.type,
+      title: item.title,
+      poster: item.poster || "",
+      season: season || null,
+      ep: ep || null,
+      startedAt: Date.now(),
+    };
+  }
+
+  function _wtEnd() {
+    if (!_wtSession) return;
+    const endedAt = Date.now();
+    const durationMs = endedAt - _wtSession.startedAt;
+    const durationMin = Math.round(durationMs / 60000);
+
+    // Only save if user watched at least 1 minute
+    if (durationMin >= 1) {
+      const record = {
+        ..._wtSession,
+        endedAt,
+        durationMs,
+        durationMin,
+      };
+      const key = `wt_${record.type}_${record.tmdbId}_${record.startedAt}`;
+      try {
+        FirebaseDB.setItem(key, JSON.stringify(record));
+      } catch (e) {}
+    }
+    _wtSession = null;
+  }
+
+  // Save on tab close / refresh
+  window.addEventListener("beforeunload", _wtEnd);
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") _wtEnd();
+  });
+
+  /* Helper: get all watch-time records for a specific tmdbId+type */
+  function _wtGetRecords(tmdbId, type) {
+    const prefix = `wt_${type}_${tmdbId}_`;
+    const out = [];
+    for (let i = 0; i < FirebaseDB.length; i++) {
+      const k = FirebaseDB.key(i);
+      if (k && k.startsWith(prefix)) {
+        try {
+          out.push(JSON.parse(FirebaseDB.getItem(k)));
+        } catch {}
+      }
+    }
+    return out;
+  }
+
+  /* Helper: total minutes watched across ALL titles */
+  function _wtTotalMinutes() {
+    let total = 0;
+    for (let i = 0; i < FirebaseDB.length; i++) {
+      const k = FirebaseDB.key(i);
+      if (k && k.startsWith("wt_")) {
+        try {
+          const r = JSON.parse(FirebaseDB.getItem(k));
+          total += r.durationMin || 0;
+        } catch {}
+      }
+    }
+    return total;
+  }
+
+  /* Helper: unique titles watched (at least 1 recorded session) */
+  function _wtUniqueTitles() {
+    const seen = new Set();
+    for (let i = 0; i < FirebaseDB.length; i++) {
+      const k = FirebaseDB.key(i);
+      if (k && k.startsWith("wt_")) {
+        try {
+          const r = JSON.parse(FirebaseDB.getItem(k));
+          seen.add(`${r.type}_${r.tmdbId}`);
+        } catch {}
+      }
+    }
+    return seen.size;
+  }
+
+  // Expose helpers globally so app.js analyzeWatchData can use them
+  window._wtEnd = _wtEnd;
+  window._wtTotalMinutes = _wtTotalMinutes;
+  window._wtUniqueTitles = _wtUniqueTitles;
+  window._wtGetRecords = _wtGetRecords;
+
+  /* ═══ END WATCH TIME TRACKER ═══ */
+
   /* ===== PLAY FUNCTIONS ===== */
   function playNow() {
     const movieKey = `movie_${currentItem.tmdbId}`;
     if (!checkAndUnlock(movieKey)) return;
+    _wtStart(currentItem, null, null);
     saveCW(currentItem, 1, 1);
     showMiniPlayer(currentItem, "Movie");
     addNotif(`▶ Started watching <strong>${currentItem.title}</strong>`);
@@ -2071,6 +2197,7 @@ window._svAppReady = function () {
     if (!checkAndUnlock(epKey)) return;
     currentSeason = season;
     currentEpisode = ep;
+    _wtStart(currentItem, season, ep);
     saveCW(currentItem, season, ep);
     showMiniPlayer(currentItem, `S${season} E${ep}`);
     addNotif(
@@ -2405,6 +2532,7 @@ window._svAppReady = function () {
   }
 
   function closePlayer() {
+    _wtEnd();
     document.getElementById("playerFrame").src = "";
     document.getElementById("playerModal").classList.remove("open");
     if (currentItem) renderDetail(currentItem);
@@ -2412,6 +2540,7 @@ window._svAppReady = function () {
   }
 
   function closeAll() {
+    _wtEnd();
     document.getElementById("playerFrame").src = "";
     document.getElementById("playerModal").classList.remove("open");
     document.getElementById("detailModal").classList.remove("open");
@@ -4874,17 +5003,88 @@ window._svAppReady = function () {
 
       showToast("☁️ " + allContent.length + " titles loaded");
 
+      /* ═══ SHARE BANNER ═══ */
+      let _shareBannerItem = null;
+
+      function openShareBanner(item, sharerName) {
+        _shareBannerItem = item;
+        const modal = document.getElementById("shareBannerModal");
+        const bg = document.getElementById("shareBannerBg");
+        const poster = document.getElementById("shareBannerPoster");
+        if (!modal) return;
+
+        const posterUrl = item.poster
+          ? `https://image.tmdb.org/t/p/w780${item.poster}`
+          : "";
+
+        // Fill in fields
+        document.getElementById("shareBannerTitle").textContent =
+          item.title || "—";
+        document.getElementById("shareBannerType").textContent =
+          item.type === "tv" ? "Series" : "Movie";
+        document.getElementById("shareBannerYear").textContent =
+          item.year || (item.release_date || "").slice(0, 4) || "";
+        document.getElementById("shareBannerRating").textContent = item.rating
+          ? "★ " + Number(item.rating).toFixed(1)
+          : "";
+        document.getElementById("shareBannerGenres").textContent = (
+          item.genres || []
+        )
+          .slice(0, 3)
+          .join(" · ");
+        document.getElementById("shareBannerOverview").textContent =
+          item.overview
+            ? item.overview.slice(0, 180) +
+              (item.overview.length > 180 ? "…" : "")
+            : "";
+        document.getElementById("shareBannerInvite").textContent = sharerName
+          ? `👤 Shared by ${sharerName}`
+          : "";
+
+        if (posterUrl) {
+          poster.src = posterUrl;
+          bg.style.backgroundImage = `url(${posterUrl})`;
+        }
+
+        modal.style.display = "flex";
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeShareBanner() {
+        const modal = document.getElementById("shareBannerModal");
+        if (modal) modal.style.display = "none";
+        document.body.style.overflow = "";
+        _shareBannerItem = null;
+      }
+
+      function watchFromShareBanner() {
+        const item = _shareBannerItem;
+        closeShareBanner();
+        if (item) setTimeout(() => openContent(item), 150);
+      }
+
+      window.openShareBanner = openShareBanner;
+      window.closeShareBanner = closeShareBanner;
+      window.watchFromShareBanner = watchFromShareBanner;
+      /* ═══ END SHARE BANNER ═══ */
+
       // ── Deep-link: open shared movie/series from URL params ──
       // Must run here, after allContent is populated.
       (function handleSharedDeepLink() {
         const params = new URLSearchParams(window.location.search);
         const sharedId = params.get("id");
         const sharedType = params.get("type");
+        const sharerName = params.get("from")
+          ? decodeURIComponent(params.get("from"))
+          : "";
         if (sharedId && sharedType) {
           const sharedItem = allContent.find(
             (i) => String(i.tmdbId) === sharedId && i.type === sharedType,
           );
-          if (sharedItem) setTimeout(() => openContent(sharedItem), 400);
+          if (sharedItem) {
+            // Show the share banner instead of jumping straight to detail
+            setTimeout(() => openShareBanner(sharedItem, sharerName), 400);
+          }
         }
       })();
     })

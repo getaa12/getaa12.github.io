@@ -28,6 +28,22 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>StreamVault — Watch Movies & Series</title>
+
+<!-- ═══ SVP FAVICON (inline SVG) ═══ -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8622a'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-weight='700' font-size='28' fill='white'%3ESVP%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8622a'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-weight='700' font-size='28' fill='white'%3ESVP%3C/text%3E%3C/svg%3E">
+
+<!-- ═══ DEFAULT OG / TWITTER META (overridden dynamically for shared links) ═══ -->
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="StreamVault">
+<meta property="og:title"       id="og-title"       content="StreamVault — Watch Movies & Series">
+<meta property="og:description" id="og-description" content="Discover and track movies & series on StreamVault.">
+<meta property="og:image"       id="og-image"       content="">
+<meta property="og:url"         id="og-url"         content="">
+<meta name="twitter:card"       content="summary_large_image">
+<meta name="twitter:title"      id="tw-title"       content="StreamVault">
+<meta name="twitter:description" id="tw-description" content="Watch on StreamVault">
+<meta name="twitter:image"      id="tw-image"       content="">
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css">
@@ -39,69 +55,6 @@
 
   <link rel="stylesheet" href="inline.css">
   <script defer src="inline.js"></script>
-  <style>
-    /* ── Guest mode styles ── */
-    .auth-guest-divider {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 4px 0 0;
-      color: rgba(255,255,255,0.25);
-      font-size: 12px;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-    .auth-guest-divider::before,
-    .auth-guest-divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(255,255,255,0.1);
-    }
-    .auth-guest-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      padding: 10px 16px;
-      background: transparent;
-      border: 1px dashed rgba(255,255,255,0.18);
-      border-radius: 10px;
-      color: rgba(255,255,255,0.5);
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: border-color 0.2s, color 0.2s, background 0.2s;
-      font-family: inherit;
-    }
-    .auth-guest-btn:hover {
-      border-color: rgba(255,255,255,0.35);
-      color: rgba(255,255,255,0.75);
-      background: rgba(255,255,255,0.04);
-    }
-    .auth-guest-notice {
-      display: flex;
-      align-items: flex-start;
-      gap: 7px;
-      background: rgba(232,98,42,0.08);
-      border: 1px solid rgba(232,98,42,0.2);
-      border-radius: 8px;
-      padding: 9px 12px;
-      color: rgba(255,255,255,0.5);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-    .auth-guest-notice strong {
-      color: rgba(232,98,42,0.85);
-    }
-    #guestBanner {
-      display: none;
-    }
-    #guestBanner.visible {
-      display: flex !important;
-    }
-  </style>
 </head>
 <body>
 <!-- ═══ LOADING SCREEN — painted instantly on every refresh ═══ -->
@@ -169,16 +122,6 @@
         </svg>
         <span>Continue with Google</span>
       </button>
-      <!-- Guest access -->
-      <div class="auth-guest-divider"><span>just browsing?</span></div>
-      <button class="auth-guest-btn" onclick="doGuestContinue()" type="button">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        <span>Continue as Guest</span>
-      </button>
-      <div class="auth-guest-notice">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span>Guest mode is <strong>view only</strong> — watchlists, ratings, and progress won't be saved.</span>
-      </div>
     </div>
 
     <!-- Sign Up Form -->
@@ -208,26 +151,8 @@
         </svg>
         <span>Continue with Google</span>
       </button>
-      <!-- Guest access -->
-      <div class="auth-guest-divider"><span>just browsing?</span></div>
-      <button class="auth-guest-btn" onclick="doGuestContinue()" type="button">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        <span>Continue as Guest</span>
-      </button>
-      <div class="auth-guest-notice">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span>Guest mode is <strong>view only</strong> — watchlists, ratings, and progress won't be saved.</span>
-      </div>
     </div>
   </div>
-</div>
-
-<!-- ═══ GUEST MODE BANNER (shown when browsing without an account) ═══ -->
-<div id="guestBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;background:linear-gradient(90deg,#1a1a2e,#16213e);border-top:1px solid rgba(232,98,42,0.35);padding:10px 20px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8622a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-  <span style="color:rgba(255,255,255,0.75);font-size:13px;flex:1;min-width:200px">You're browsing as a <strong style="color:#e8622a">Guest</strong> — watchlists, ratings &amp; progress won't be saved.</span>
-  <button onclick="document.getElementById('authScreen').style.display='flex';document.getElementById('guestBanner').style.display='none';" style="background:#e8622a;color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Sign In / Sign Up</button>
-  <button onclick="document.getElementById('guestBanner').style.display='none'" style="background:transparent;color:rgba(255,255,255,0.4);border:none;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">&times;</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -1302,6 +1227,36 @@
   </div>
 </div>
 
+
+<!-- ═══ SHARED CONTENT BANNER MODAL ═══ -->
+<div id="shareBannerModal" style="display:none;position:fixed;inset:0;z-index:10500;align-items:center;justify-content:center;padding:16px">
+  <div id="shareBannerBg" style="position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(28px) brightness(0.35);transform:scale(1.08)"></div>
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55)"></div>
+  <div style="position:relative;width:100%;max-width:440px;background:rgba(18,18,28,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,0.7)">
+    <div id="shareBannerHero" style="position:relative;height:220px;background:#111;overflow:hidden">
+      <img id="shareBannerPoster" src="" alt="" style="width:100%;height:100%;object-fit:cover;object-position:top center;display:block">
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom, transparent 30%, rgba(18,18,28,0.95) 100%)"></div>
+      <div style="position:absolute;top:14px;left:14px;background:#e8622a;color:#fff;font-size:11px;font-weight:800;letter-spacing:0.08em;padding:4px 10px;border-radius:6px;font-family:Georgia,serif">SVP</div>
+      <button onclick="closeShareBanner()" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.5);border:none;color:rgba(255,255,255,0.7);width:30px;height:30px;border-radius:50%;font-size:18px;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div style="padding:18px 20px 22px">
+      <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#e8622a;font-weight:600;margin-bottom:6px" id="shareBannerType">Movie</div>
+      <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:6px;font-family:Georgia,serif" id="shareBannerTitle">—</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <span id="shareBannerYear"></span>
+        <span id="shareBannerRating" style="color:#f5c518;font-weight:600"></span>
+        <span id="shareBannerGenres" style="color:rgba(255,255,255,0.35)"></span>
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.55);line-height:1.6;margin-bottom:18px;max-height:72px;overflow:hidden" id="shareBannerOverview"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.3);margin-bottom:16px" id="shareBannerInvite"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="watchFromShareBanner()" style="flex:1;background:#e8622a;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">▶ Watch Now</button>
+        <button onclick="closeShareBanner()" style="background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.1);padding:12px 16px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">Browse</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ═══ END SHARE BANNER MODAL ═══ -->
 </div><!-- #appRoot -->
 <!-- Poster strip removed — hero now uses full-bleed TMDB backdrop (see hero script above) -->
 </body>
