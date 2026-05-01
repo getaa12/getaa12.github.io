@@ -39,6 +39,69 @@
 
   <link rel="stylesheet" href="inline.css">
   <script defer src="inline.js"></script>
+  <style>
+    /* ── Guest mode styles ── */
+    .auth-guest-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 4px 0 0;
+      color: rgba(255,255,255,0.25);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .auth-guest-divider::before,
+    .auth-guest-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+    }
+    .auth-guest-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 16px;
+      background: transparent;
+      border: 1px dashed rgba(255,255,255,0.18);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.5);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      font-family: inherit;
+    }
+    .auth-guest-btn:hover {
+      border-color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.75);
+      background: rgba(255,255,255,0.04);
+    }
+    .auth-guest-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      background: rgba(232,98,42,0.08);
+      border: 1px solid rgba(232,98,42,0.2);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: rgba(255,255,255,0.5);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .auth-guest-notice strong {
+      color: rgba(232,98,42,0.85);
+    }
+    #guestBanner {
+      display: none;
+    }
+    #guestBanner.visible {
+      display: flex !important;
+    }
+  </style>
 </head>
 <body>
 <!-- ═══ LOADING SCREEN — painted instantly on every refresh ═══ -->
@@ -106,6 +169,16 @@
         </svg>
         <span>Continue with Google</span>
       </button>
+      <!-- Guest access -->
+      <div class="auth-guest-divider"><span>just browsing?</span></div>
+      <button class="auth-guest-btn" onclick="doGuestContinue()" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span>Continue as Guest</span>
+      </button>
+      <div class="auth-guest-notice">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Guest mode is <strong>view only</strong> — watchlists, ratings, and progress won't be saved.</span>
+      </div>
     </div>
 
     <!-- Sign Up Form -->
@@ -135,8 +208,26 @@
         </svg>
         <span>Continue with Google</span>
       </button>
+      <!-- Guest access -->
+      <div class="auth-guest-divider"><span>just browsing?</span></div>
+      <button class="auth-guest-btn" onclick="doGuestContinue()" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span>Continue as Guest</span>
+      </button>
+      <div class="auth-guest-notice">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Guest mode is <strong>view only</strong> — watchlists, ratings, and progress won't be saved.</span>
+      </div>
     </div>
   </div>
+</div>
+
+<!-- ═══ GUEST MODE BANNER (shown when browsing without an account) ═══ -->
+<div id="guestBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;background:linear-gradient(90deg,#1a1a2e,#16213e);border-top:1px solid rgba(232,98,42,0.35);padding:10px 20px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8622a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <span style="color:rgba(255,255,255,0.75);font-size:13px;flex:1;min-width:200px">You're browsing as a <strong style="color:#e8622a">Guest</strong> — watchlists, ratings &amp; progress won't be saved.</span>
+  <button onclick="document.getElementById('authScreen').style.display='flex';document.getElementById('guestBanner').style.display='none';" style="background:#e8622a;color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Sign In / Sign Up</button>
+  <button onclick="document.getElementById('guestBanner').style.display='none'" style="background:transparent;color:rgba(255,255,255,0.4);border:none;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">&times;</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
