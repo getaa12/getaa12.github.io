@@ -742,11 +742,11 @@
   /* ===== "NEW" RELEASE BADGE ===== */
   .card-new-badge {
     position:absolute; top:8px; left:8px; z-index:6;
-    background:linear-gradient(135deg,#ff4b4b,#ff8c00);
+    background: var(--accent);
     color:#fff; font-size:10px; font-weight:800;
     padding:3px 8px; border-radius:4px; font-family:var(--font-display);
     letter-spacing:.06em; text-transform:uppercase;
-    box-shadow:0 2px 8px rgba(255,75,75,0.5);
+    box-shadow:0 2px 8px rgba(232,98,42,0.4);
     animation:newBadgePop .4s ease;
   }
   @keyframes newBadgePop { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
@@ -867,8 +867,8 @@
     animation: newBadgePop .4s ease, newBadgePulse 2s ease 0.5s infinite;
   }
   @keyframes newBadgePulse {
-    0%,100% { box-shadow: 0 2px 8px rgba(255,75,75,0.5); }
-    50% { box-shadow: 0 2px 16px rgba(255,75,75,0.8); }
+    0%,100% { box-shadow: 0 2px 8px rgba(232,98,42,0.4); }
+    50% { box-shadow: 0 2px 16px rgba(232,98,42,0.7); }
   }
   
   /* Better bottom nav */
@@ -2793,3 +2793,430 @@
     font-size: 10px;
     opacity: 0.75;
   }
+/* ═══════════════════════════════════════════════════════
+   TASTE PROFILE CARD
+═══════════════════════════════════════════════════════ */
+
+/* Trigger button inside profile modal */
+.taste-card-trigger-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, rgba(232,98,42,0.15), rgba(245,144,96,0.08));
+  border: 1.5px solid rgba(232,98,42,0.4);
+  border-radius: var(--radius);
+  color: var(--accent2);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--tr);
+  letter-spacing: -.01em;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.taste-card-trigger-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(232,98,42,0.06), transparent);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.taste-card-trigger-btn:hover { border-color: var(--accent); color: var(--white); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(232,98,42,0.18); }
+.taste-card-trigger-btn:hover::before { opacity: 1; }
+.taste-card-trigger-badge {
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: .06em;
+  animation: tastePulse 2s ease infinite;
+}
+@keyframes tastePulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .8; transform: scale(1.05); }
+}
+
+/* Modal shell */
+.taste-card-shell {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  max-height: 95vh;
+  overflow-y: auto;
+}
+.taste-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.taste-card-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--white);
+}
+.taste-share-btn, .taste-dl-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border2);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--tr);
+}
+.taste-share-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.taste-share-btn:hover { background: var(--accent2); }
+.taste-dl-btn {
+  background: transparent;
+  color: var(--muted);
+}
+.taste-dl-btn:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* Stage holding the card */
+.taste-card-stage {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+}
+
+/* ──── THE CARD ──── */
+.taste-card {
+  width: 100%;
+  max-width: 100%;
+  background: #0c0c10;
+  border-radius: 18px;
+  padding: 22px 22px 18px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,98,42,0.06);
+  font-family: 'Outfit', system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Background animated blobs */
+.tc-bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+.tc-blob1 {
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(232,98,42,0.28) 0%, transparent 70%);
+  top: -80px; right: -60px;
+  animation: tcBlob1 8s ease-in-out infinite;
+}
+.tc-blob2 {
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(120,60,180,0.18) 0%, transparent 70%);
+  bottom: 20px; left: -60px;
+  animation: tcBlob2 10s ease-in-out infinite;
+}
+.tc-blob3 {
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(245,144,96,0.12) 0%, transparent 70%);
+  bottom: 80px; right: 20px;
+  animation: tcBlob3 12s ease-in-out infinite;
+}
+@keyframes tcBlob1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-20px,15px) scale(1.1)} }
+@keyframes tcBlob2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(15px,-20px) scale(1.08)} }
+@keyframes tcBlob3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-10px,10px) scale(0.92)} }
+
+/* Everything inside card must be above blobs */
+.taste-card > * { position: relative; z-index: 1; }
+
+/* Top strip */
+.tc-top-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tc-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.tc-brand-dot {
+  width: 6px; height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.tc-year {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: .06em;
+}
+
+/* Identity row */
+.tc-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tc-avatar {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: var(--bg3);
+  border: 1.5px solid rgba(232,98,42,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(232,98,42,0.2);
+}
+.tc-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.tc-username {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+}
+.tc-tagline {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.35);
+  font-weight: 500;
+  letter-spacing: .02em;
+  margin-top: 2px;
+}
+
+/* Personality hero block */
+.tc-personality-wrap {
+  background: linear-gradient(135deg, rgba(232,98,42,0.14) 0%, rgba(245,144,96,0.06) 100%);
+  border: 1px solid rgba(232,98,42,0.25);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.tc-personality-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.tc-personality {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.04em;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.tc-personality-desc {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.5;
+}
+
+/* Stats row */
+.tc-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 12px 0;
+}
+.tc-stat {
+  flex: 1;
+  text-align: center;
+}
+.tc-stat-num {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--accent2);
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+.tc-stat-lbl {
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.35);
+  font-weight: 500;
+  margin-top: 3px;
+  letter-spacing: .01em;
+}
+.tc-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+/* Sections */
+.tc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tc-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: rgba(255,255,255,0.3);
+}
+
+/* Genre pills */
+.tc-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tc-genre-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.tc-g1, .tc-g2, .tc-g3, .tc-g4, .tc-g5 { background: rgba(232,98,42,0.15); color: var(--accent2); border: 1px solid rgba(232,98,42,0.28); }
+
+/* Decade era bar */
+.tc-decade-row {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 32px;
+}
+.tc-decade-bar {
+  flex: 1;
+  border-radius: 4px 4px 2px 2px;
+  background: rgba(232,98,42,0.15);
+  border: 1px solid rgba(232,98,42,0.12);
+  position: relative;
+  transition: height .6s cubic-bezier(.4,0,.2,1);
+  min-height: 4px;
+  cursor: default;
+}
+.tc-decade-bar.active {
+  background: linear-gradient(180deg, var(--accent2), var(--accent));
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(232,98,42,0.35);
+}
+.tc-decade-bar-lbl {
+  position: absolute;
+  bottom: -17px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  color: rgba(255,255,255,0.3);
+  white-space: nowrap;
+  font-weight: 600;
+}
+.tc-decade-bar.active .tc-decade-bar-lbl {
+  color: var(--accent2);
+}
+
+/* Taste badges row */
+.tc-badges-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tc-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+}
+.tc-badge-icon { font-size: 0.85rem; }
+
+/* Footer */
+.tc-footer {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.18);
+  text-align: center;
+  letter-spacing: .04em;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* Regen strip */
+.taste-regen-hint {
+  padding: 12px 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.taste-regen-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--tr);
+}
+.taste-regen-btn:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* Card entry animation */
+@keyframes tcCardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.taste-card { animation: tcCardIn .5s cubic-bezier(.2,.8,.3,1) both; }

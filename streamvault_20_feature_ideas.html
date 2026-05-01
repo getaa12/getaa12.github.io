@@ -1,0 +1,78 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px;padding:1rem 0}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px 16px;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:var(--color-border-secondary)}
+.card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.num{font-size:11px;font-weight:500;color:var(--color-text-secondary);min-width:20px;margin-top:2px}
+.title{font-size:14px;font-weight:500;color:var(--color-text-primary);line-height:1.35}
+.desc{font-size:13px;color:var(--color-text-secondary);line-height:1.5;padding-left:30px}
+.badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle}
+.b-hot{background:#FAECE7;color:#993C1D}
+.b-social{background:#E1F5EE;color:#0F6E56}
+.b-ux{background:#E6F1FB;color:#185FA5}
+.b-viral{background:#FAEEDA;color:#854F0B}
+.b-ai{background:#EEEDFE;color:#534AB7}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem;padding-top:0.5rem}
+button.fb{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;transition:all .15s}
+button.fb.active{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary)}
+</style>
+
+<div class="filter-row">
+  <button class="fb active" onclick="filter('all',this)">All 20</button>
+  <button class="fb" onclick="filter('hot',this)">🔥 High Impact</button>
+  <button class="fb" onclick="filter('social',this)">🌱 Social</button>
+  <button class="fb" onclick="filter('ux',this)">✦ UX</button>
+  <button class="fb" onclick="filter('viral',this)">📢 Viral</button>
+  <button class="fb" onclick="filter('ai',this)">🤖 AI</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+const ideas = [
+  {n:1,tag:"hot",title:"\"What to Watch\" AI Quiz",desc:"A 5-question quiz (mood, time available, last film loved) that ends with a personalized pick from your catalog. Far more engaging than filters."},
+  {n:2,tag:"social",title:"Friend Activity Feed",desc:"See what friends added to their watchlist or just finished — shown as a live ticker in the sidebar. Creates FOMO and drives return visits."},
+  {n:3,tag:"hot",title:"Trailer Autoplay on Hover",desc:"Hover a movie card for 1.5s and the trailer mutes-autoplays inside the card. This is the single biggest UX upgrade Netflix-style sites can have."},
+  {n:4,tag:"viral",title:"Shareable Taste Profile Card",desc:"A beautiful auto-generated card (like Spotify Wrapped) showing your top genres, most-watched decade, and a 'film personality' label. Users share it."},
+  {n:5,tag:"ux",title:"'Hidden Gems' Section",desc:"An algorithmically curated row of high-rated but low-popularity films. Users love discovering things others haven't seen — makes your site feel smart."},
+  {n:6,tag:"ai",title:"AI Synopsis Rewriter",desc:"'Explain this movie like I'm 10 / like it's a horror film / in 1 sentence.' Powered by Claude API inside the movie detail modal."},
+  {n:7,tag:"social",title:"Live Viewer Count Badge",desc:"Show '🔴 142 watching now' on popular films. Adds social proof and urgency without needing real data — you can simulate it with seeded randoms."},
+  {n:8,tag:"hot",title:"Watchlist Import from Letterboxd",desc:"Paste your Letterboxd export CSV and auto-populate the watchlist. This is the #1 reason people stick with a new platform — their data is already there."},
+  {n:9,tag:"ux",title:"'Just 90 Minutes' Filter",desc:"A one-click filter for films under 90 minutes. One of the most-searched things on movie sites. Simple to build, high daily use."},
+  {n:10,tag:"viral",title:"Movie DNA Comparison",desc:"Pick two films and show a Venn diagram of shared cast, directors, themes, and mood. 'You liked Inception — here's its DNA overlap with Interstellar.'"},
+  {n:11,tag:"ux",title:"Cinematic Night Mode",desc:"A dedicated 'Theater mode' that dims everything except the player area and adds ambient color glow around the screen matching the film's palette."},
+  {n:12,tag:"social",title:"Public Reviews with Reactions",desc:"Short 280-char reviews with 5 emoji reactions (😂❤️😱🤯😴). You already have comments — this upgrades it into a Reddit-style engagement loop."},
+  {n:13,tag:"hot",title:"'Continue Watching' Sync Across Devices",desc:"Timestamp sync via Firebase so picking up on mobile continues where the desktop left off. This is table-stakes for retention — users expect it."},
+  {n:14,tag:"ai",title:"Smart 'Because You Watched' Row",desc:"After a user finishes or rates a film, surface a dynamically generated row with a visible reason: 'Because you liked dark psychological thrillers.'"},
+  {n:15,tag:"viral",title:"Year in Review (Personal Wrapped)",desc:"December card: total watch hours, top genre, longest streak, rarest film watched. One shareable image users post on social every year."},
+  {n:16,tag:"ux",title:"Fullscreen Keyboard Shortcut Cheatsheet",desc:"Press ? to get an overlay of every keyboard shortcut. You already have shortcuts — surfacing them dramatically increases power-user retention."},
+  {n:17,tag:"social",title:"Watch Party Rooms with Chat",desc:"Create a room link, friends join, video stays synced. You have Watch Together already — adding live in-room emoji reactions makes it 10x stickier."},
+  {n:18,tag:"hot",title:"Director / Actor Deep-Dive Pages",desc:"Click any actor name → a page with their full filmography from your catalog, a bio, and 'fans also watched' row. Keeps users discovering more."},
+  {n:19,tag:"ai",title:"'Feeling Lucky' Roulette Button",desc:"Press and hold for 3 seconds → random movie starts playing. No thinking required. Ideal for indecisive users who spend 20 min choosing."},
+  {n:20,tag:"ux",title:"Offline Watchlist Mode (PWA)",desc:"Add to home screen + service worker caches the browse page and watchlist so it loads instantly offline. Makes it feel like a real app, not a website."},
+];
+
+const bMap={hot:'🔥 High Impact',social:'🌱 Social',ux:'✦ UX',viral:'📢 Viral',ai:'🤖 AI'};
+const cMap={hot:'b-hot',social:'b-social',ux:'b-ux',viral:'b-viral',ai:'b-ai'};
+
+function render(list){
+  document.getElementById('grid').innerHTML=list.map(i=>`
+    <div class="card">
+      <div class="card-top">
+        <span class="num">${i.n}</span>
+        <span class="title">${i.title}<span class="badge ${cMap[i.tag]}">${bMap[i.tag]}</span></span>
+      </div>
+      <div class="desc">${i.desc}</div>
+    </div>`).join('');
+}
+
+function filter(tag,btn){
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render(tag==='all'?ideas:ideas.filter(i=>i.tag===tag));
+}
+
+render(ideas);
+</script>

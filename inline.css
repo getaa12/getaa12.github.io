@@ -1,0 +1,143 @@
+/* ================================================================
+   inline.css — extracted from index.html
+   (loader, taste-card blob fixes, skeleton cards)
+================================================================ */
+
+#sv-loader{
+  position:fixed;inset:0;z-index:99999;
+  background:#0f0f13;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:24px;
+  transition:opacity .2s ease,visibility .2s ease;
+}
+#sv-loader.out{opacity:0;visibility:hidden;pointer-events:none;}
+.svl-logo{display:flex;align-items:center;gap:12px;}
+.svl-dot{
+  width:12px;height:12px;border-radius:50%;
+  background:#e8622a;
+  animation:svlBlink 1s ease infinite;
+}
+@keyframes svlBlink{0%,100%{opacity:1}50%{opacity:.3}}
+.svl-title{
+  font-family:'Outfit',system-ui,sans-serif;
+  font-size:1.6rem;font-weight:800;
+  color:#f0f0f5;letter-spacing:-.03em;
+}
+.svl-sub{
+  font-family:'Outfit',system-ui,sans-serif;
+  font-size:13px;color:#7a7a8a;letter-spacing:-.01em;
+  margin-top:-14px;
+}
+.svl-bar-wrap{
+  width:200px;height:3px;
+  background:rgba(255,255,255,.07);
+  border-radius:999px;overflow:hidden;
+}
+.svl-bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#e8622a,#f59060);
+  border-radius:999px;
+  animation:svlFill .8s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes svlFill{
+  0%{width:0%}40%{width:55%}70%{width:78%}90%{width:90%}100%{width:90%}
+}
+.svl-steps{display:flex;gap:8px;align-items:center;}
+.svl-step{
+  width:6px;height:6px;border-radius:50%;
+  background:rgba(255,255,255,.1);
+  transition:background .1s,transform .1s;
+}
+.svl-step.active{background:#e8622a;transform:scale(1.5);}
+.svl-step.done{background:rgba(232,98,42,.3);}
+.svl-msg{
+  font-family:'Outfit',system-ui,sans-serif;
+  font-size:12px;color:#7a7a8a;
+  min-height:18px;
+  transition:opacity .1s;
+}
+
+/* ────────────────────────────────────────────────── */
+
+/*
+  FIX 1 — Shell: never let it exceed the viewport; no overflow-y scroll on
+  the outer shell so the stage area never shifts under the header.
+*/
+.taste-card-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: min(95vh, 820px);
+  overflow: hidden;          /* shell itself clips, not scrolls */
+}
+
+/*
+  FIX 2 — Stage: fills remaining space inside the shell, centres the card,
+  and clips anything that pokes out of bounds.
+*/
+.taste-card-stage {
+  flex: 1 1 auto;
+  min-height: 0;             /* allow flex shrink below content size */
+  overflow: hidden;          /* hard clip — nothing escapes */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/*
+  FIX 3 — Card: must be the stacking context so absolutely-positioned blobs
+  are contained inside it. overflow:hidden ensures the visual clip.
+*/
+.taste-card {
+  position: relative;        /* establishes containing block for blobs */
+  overflow: hidden;          /* visually clips blobs to card bounds */
+}
+
+/*
+  FIX 4 — Blobs: reposition so they stay *inside* the card boundary.
+  Previous values like top:-80px pushed them above the card, causing
+  html2canvas to extend the capture region upward.
+  Each blob is ~400–500px so partial overlap at edges is intentional.
+*/
+.tc-bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Top-left warm blob — was top:-80px, now anchored inside */
+.tc-blob1 {
+  width: 320px;
+  height: 320px;
+  top: -60px;               /* only 60px peek — card overflow:hidden clips it */
+  left: -80px;
+}
+
+/* Bottom-right cool blob */
+.tc-blob2 {
+  width: 280px;
+  height: 280px;
+  bottom: -60px;
+  right: -60px;
+}
+
+/* Centre accent blob */
+.tc-blob3 {
+  width: 220px;
+  height: 220px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* ────────────────────────────────────────────────── */
+
+.skeleton-card{background:var(--bg2,rgba(255,255,255,.06));border-radius:12px;overflow:hidden;animation:skelPulse 1.4s ease-in-out infinite;}
+.skeleton-poster{width:100%;aspect-ratio:2/3;background:rgba(255,255,255,.07);}
+.skeleton-body{padding:10px 12px;}
+.skeleton-line{height:11px;border-radius:4px;background:rgba(255,255,255,.08);margin-bottom:8px;}
+.skeleton-line.short{width:55%;}
+@keyframes skelPulse{0%,100%{opacity:1}50%{opacity:.5}}
