@@ -1,3 +1,49 @@
+/* ═══════════════════════════════════════════════════════
+   GUEST MODE  —  allow browsing without an account
+   Sets window.SV_GUEST = true, hides auth screen,
+   shows the persistent guest banner, and intercepts
+   any "save" action with a friendly sign-in prompt.
+═══════════════════════════════════════════════════════ */
+window.SV_GUEST = false;
+
+window.doGuestContinue = function () {
+  window.SV_GUEST = true;
+
+  // Hide the auth screen
+  var authScreen = document.getElementById('authScreen');
+  if (authScreen) authScreen.style.display = 'none';
+
+  // Show persistent guest banner at the bottom
+  var banner = document.getElementById('guestBanner');
+  if (banner) banner.classList.add('visible');
+
+  // Show the main app if it's hidden (some builds hide #appRoot until auth)
+  var appRoot = document.getElementById('appRoot');
+  if (appRoot && appRoot.style.display === 'none') {
+    appRoot.style.display = '';
+  }
+};
+
+/* Guest-safe wrapper: call this for any action that requires saving.
+   Shows a toast asking the user to sign in instead of silently failing. */
+window._requireAuth = function (actionLabel) {
+  if (!window.SV_GUEST) return false; // not a guest — proceed normally
+  // Show a toast / inline prompt
+  var msg = '🔒 ' + (actionLabel || 'This feature') + ' requires an account. Sign in to save your progress!';
+  if (typeof showToast === 'function') {
+    showToast(msg);
+  } else {
+    // Fallback: flash the guest banner
+    var banner = document.getElementById('guestBanner');
+    if (banner) {
+      banner.classList.add('visible');
+      banner.style.borderTopColor = '#e8622a';
+      setTimeout(function () { banner.style.borderTopColor = ''; }, 1500);
+    }
+  }
+  return true; // means "blocked — user is guest"
+};
+
 // ── Global stubs: keep onclick handlers safe before Firebase auth is ready ──
 // The real implementations are defined inside _svAppReady() and will
 // overwrite these automatically once the user is authenticated.
@@ -101,6 +147,35 @@
     if (typeof window[name] === "undefined") {
       window[name] = noop;
     }
+  });
+
+  // ── Guest interceptions: override specific stubs so guests see a prompt ──
+  var guestBlockedActions = {
+    toggleWatchlist:          'Adding to watchlist',
+    toggleCompleted:          'Marking as watched',
+    setUserRating:            'Rating titles',
+    saveProfile:              'Saving your profile',
+    moveWlItem:               'Managing your watchlist',
+    removeFromMultiWl:        'Managing your watchlist',
+    toggleWishlistDetail:     'Managing your watchlist',
+    clearAllCW:               'Continue watching history',
+    removeCW:                 'Continue watching history',
+    snapCurrentContent:       'Saving a snapshot',
+    toggleReaction:           'Reacting to content',
+    submitComment:            'Posting comments',
+    deleteComment:            'Deleting comments',
+    setWatchGoal:             'Setting watch goals',
+    openWatchTogetherModal:   'Watch Together sessions',
+  };
+
+  Object.keys(guestBlockedActions).forEach(function (name) {
+    (function (n, label) {
+      var original = window[n]; // may be noop or already set
+      window[n] = function () {
+        if (window._requireAuth(label)) return;
+        if (typeof original === 'function') original.apply(this, arguments);
+      };
+    })(name, guestBlockedActions[name]);
   });
   // checkAndUnlock must return true to allow play
   window.checkAndUnlock = function () {
