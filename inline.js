@@ -3497,8 +3497,8 @@ window._svAppReady = function () {
 
   /* ---- STOP ADS / ADGUARD DNS MODAL ---- */
   const _stopAdsVideos = {
-    android: "https://www.youtube.com/embed/7LvapEuPWQA",
-    iphone: "https://www.youtube.com/embed/2EpkKd8K8K0",
+    android: "https://www.youtube.com/embed/6KBlM5F7XUI",
+    iphone: "https://www.youtube.com/embed/iPquyxU_Om0",
     windows: "https://www.youtube.com/embed/pu30Bv9hwJo",
   };
   let _stopAdsCurrentTab = "android";
@@ -3530,7 +3530,7 @@ window._svAppReady = function () {
       // Lazy-load video only when tab is opened
       if (isActive) {
         const vid = document.getElementById("stopAdsVideo-" + p);
-        if (vid && !vid.src) vid.src = _stopAdsVideos[p];
+        if (vid && !vid.src.includes("youtube")) vid.src = _stopAdsVideos[p];
       }
     });
   }
