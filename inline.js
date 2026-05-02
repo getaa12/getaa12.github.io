@@ -558,9 +558,13 @@ window._svAppReady = function () {
     if (lastLogin !== today) {
       FirebaseDB.setItem("sv_last_login", today);
       setTimeout(() => {
-        showToast("🎁 Daily Bonus: +10 Points earned!");
+        if (window._svpAwardLogin) window._svpAwardLogin();
       }, 1500);
     }
+    // Check for pending gift notifications
+    setTimeout(() => {
+      if (window._svCheckGiftNotifs) window._svCheckGiftNotifs();
+    }, 2000);
   }
 
   /* =========================================
@@ -735,6 +739,7 @@ window._svAppReady = function () {
     window._selectedColor = p.color || "#e8622a";
 
     document.getElementById("profileModal").classList.add("open");
+    if (window.svPopulateUid) window.svPopulateUid();
   }
 
   function closeProfileModal() {
@@ -779,6 +784,8 @@ window._svAppReady = function () {
   }
 
   async function saveProfile() {
+    if (window._requireAuth && window._requireAuth("Saving your profile"))
+      return;
     const name =
       document.getElementById("profileNameInput").value.trim() || "Guest";
     const bio = document.getElementById("profileBioInput").value.trim();
@@ -924,6 +931,7 @@ window._svAppReady = function () {
   }
 
   async function submitComment(ck) {
+    if (window._requireAuth && window._requireAuth("Posting comments")) return;
     const textarea = document.getElementById("commentInput");
     const btn = document.getElementById("commentSubmitBtn");
     if (!textarea || !btn) return;
@@ -979,6 +987,7 @@ window._svAppReady = function () {
 
   function shareContent() {
     if (!currentItem) return;
+    if (window._svpAwardShare) window._svpAwardShare();
     const baseUrl = window.location.origin + window.location.pathname;
     const sharer = FirebaseDB.getItem("sv_username") || "";
     const shareUrl = `${baseUrl}?type=${currentItem.type}&id=${currentItem.tmdbId}${sharer ? "&from=" + encodeURIComponent(sharer) : ""}`;
@@ -1044,6 +1053,9 @@ window._svAppReady = function () {
   }
 
   function toggleCompleted() {
+    if (window._requireAuth && window._requireAuth("Marking as watched"))
+      return;
+    if (window._svpAwardWatch) window._svpAwardWatch();
     if (!currentItem) return;
     const key = currentItem.type + "_" + currentItem.tmdbId;
     if (completedContent[key]) {
@@ -1451,6 +1463,7 @@ window._svAppReady = function () {
 
   function openContent(item) {
     currentItem = item;
+    window._svCurrentItem = item; // expose for app.js repost enrichment
     currentSeason = 1;
     currentEpisode = 1;
     renderDetail(item);
@@ -2882,6 +2895,8 @@ window._svAppReady = function () {
   }
 
   function setUserRating(val) {
+    if (window._requireAuth && window._requireAuth("Rating titles")) return;
+    if (window._svpAwardRate) window._svpAwardRate();
     if (!currentItem) return;
     const key = currentItem.type + "_" + currentItem.tmdbId;
     if (userRatings[key] === val) {
@@ -3475,12 +3490,62 @@ window._svAppReady = function () {
   let rouletteAnimFrame = null;
 
   function openRandom() {
-    const pool = getUnique(allContent).filter((i) => i.poster);
+    if (window._requireAuth && window._requireAuth("Movie Roulette")) return;
+
+    // Show/hide Roulette+ panel based on ownership
+    const plusPanel = document.getElementById("roulettePlusPanel");
+    if (plusPanel)
+      plusPanel.style.display = window._svRouletteplus ? "block" : "none";
+
+    let pool = getUnique(allContent).filter((i) => i.poster);
+
+    // Apply Roulette+ filters if unlocked
+    if (window._svRouletteplus) {
+      const genre =
+        (document.getElementById("rouletteGenreFilter") || {}).value || "";
+      const type =
+        (document.getElementById("rouletteTypeFilter") || {}).value || "";
+      const mood =
+        (document.getElementById("rouletteMoodFilter") || {}).value || "";
+
+      const MOOD_MAP = {
+        "feel-good": {
+          genres: ["Comedy", "Romance", "Animation"],
+          minRating: 7,
+        },
+        intense: { genres: ["Action", "Thriller", "Crime"], minRating: 0 },
+        chill: { genres: ["Documentary", "Drama"], minRating: 7 },
+        "mind-bending": {
+          genres: ["Sci-Fi", "Fantasy", "Mystery"],
+          minRating: 0,
+        },
+        scary: { genres: ["Horror"], minRating: 0 },
+      };
+
+      if (genre) pool = pool.filter((i) => (i.genres || []).includes(genre));
+      if (type) pool = pool.filter((i) => i.type === type);
+      if (mood && MOOD_MAP[mood]) {
+        const m = MOOD_MAP[mood];
+        pool = pool.filter(
+          (i) =>
+            (i.genres || []).some((g) => m.genres.includes(g)) &&
+            (i.rating || 0) >= m.minRating,
+        );
+      }
+
+      // If filters yield nothing, fall back to full pool with a warning
+      if (!pool.length) {
+        showToast("⚠️ No results for those filters — showing all");
+        pool = getUnique(allContent).filter((i) => i.poster);
+      }
+    }
+
     if (!pool.length) return;
 
     const overlay = document.getElementById("roulette-overlay");
+    const alreadyOpen = overlay.classList.contains("open");
     overlay.classList.add("open");
-    document.body.style.overflow = "hidden";
+    if (!alreadyOpen) document.body.style.overflow = "hidden";
 
     // Build strip with shuffled items × 3 for looping
     const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 20);
@@ -4158,6 +4223,11 @@ window._svAppReady = function () {
 
   // ── Watch Together modal UI ──────────────────────────────────────────────────
   function openWatchTogetherModal() {
+    if (
+      window._requireAuth &&
+      window._requireAuth("Watch Together (Party Mode)")
+    )
+      return;
     const modal = document.getElementById("watchTogetherModal");
     const wtc = document.getElementById("wtContent");
     if (!modal || !wtc) return;
@@ -4261,11 +4331,13 @@ window._svAppReady = function () {
   function updatePartyDisplay() {}
 
   function openWatchParty() {
+    if (window._requireAuth && window._requireAuth("Watch Party")) return;
     openWatchTogetherModal();
   }
 
   /* ---- F6: SNAP / SCREENSHOT CARD ---- */
   function snapCurrentContent() {
+    if (window._requireAuth && window._requireAuth("Saving a snapshot")) return;
     if (!currentItem) return;
     showToast(`📸 Snap saved: ${currentItem.title}`);
     addNotif(`📸 You snapped <strong>${currentItem.title}</strong>`);
@@ -4458,6 +4530,7 @@ window._svAppReady = function () {
   let calYear = new Date().getFullYear();
   let calMonth = new Date().getMonth();
   function openCalendarModal() {
+    if (window._requireAuth && window._requireAuth("Watch Calendar")) return;
     renderCalendar();
     document.getElementById("calendarModal").classList.add("open");
     document.body.style.overflow = "hidden";
@@ -4524,6 +4597,8 @@ window._svAppReady = function () {
   /* ---- F13: SOCIAL REACTIONS ---- */
   let reactions = JSON.parse(FirebaseDB.getItem("sv_reactions") || "{}");
   function toggleReaction(type) {
+    if (window._requireAuth && window._requireAuth("Reacting to content"))
+      return;
     if (!currentItem) return;
     const key = currentItem.type + "_" + currentItem.tmdbId + "_" + type;
     const counts = JSON.parse(FirebaseDB.getItem("sv_reaction_counts") || "{}");
@@ -4588,6 +4663,8 @@ window._svAppReady = function () {
   /* ---- F16: WATCHTIME GOAL TRACKER ---- */
   let watchGoalHours = parseInt(FirebaseDB.getItem("sv_goal_hrs") || "5");
   function setWatchGoal(h) {
+    if (window._requireAuth && window._requireAuth("Setting watch goals"))
+      return;
     watchGoalHours = h;
     FirebaseDB.setItem("sv_goal_hrs", h);
   }
@@ -4993,6 +5070,7 @@ window._svAppReady = function () {
       catalogMovies = movies;
       catalogSeries = series;
       allContent = [...movies, ...series];
+      window.allContent = allContent; // expose for repost card tap-to-open
 
       filterGenre("All", null);
       renderContinueWatching();
@@ -5123,6 +5201,14 @@ window._svAppReady = function () {
   window.toggleWatchlist = toggleWatchlist;
   window.removeFromWatchlistByIndex = removeFromWatchlistByIndex;
   window.openRandom = openRandom;
+  // Expose _svRoulette so shop.js activate/restore can set plus mode
+  window._svRoulette = {
+    setPlus(val) {
+      window._svRouletteplus = val;
+      const panel = document.getElementById("roulettePlusPanel");
+      if (panel) panel.style.display = val ? "block" : "none";
+    },
+  };
   window.openContent = openContent;
   window.playTrailer = playTrailer;
   window.closeDetail = closeDetail;
@@ -5212,6 +5298,7 @@ window._svAppReady = function () {
   window.pickCollection = pickCollection;
   window.toggleFocusMode = toggleFocusMode;
   window.toggleWishlistDetail = toggleWishlistDetail;
+  window.addToMultiWl = addToMultiWl;
   window.openEarnModal = openEarnModal;
   window.closeEarnModal = closeEarnModal;
   window.openStatsModal = openStatsModal;

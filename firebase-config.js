@@ -42,6 +42,15 @@ let _uid = null;
 window.FirebaseDB = {
   setItem(key, value) {
     _cache[key] = value;
+    // Notify listeners when the multi-watchlist changes so in-memory
+    // copies (e.g. multiWatchlist inside inline.js) can stay in sync.
+    if (key === "sv_mwl") {
+      try {
+        window.dispatchEvent(
+          new CustomEvent("sv_mwl_changed", { detail: value }),
+        );
+      } catch (e) {}
+    }
     if (!_uid) return;
     const fbKey = key.replace(/[.#$[\]]/g, "_");
     set(ref(db, `users/${_uid}/${fbKey}`), value).catch(() => {});
@@ -76,7 +85,66 @@ window.FirebaseDB = {
     } catch (e) {
       console.warn("[FirebaseDB] hydrate failed", e);
     }
+    // After hydration, notify any listeners that sv_mwl is now populated
+    // so in-memory copies (e.g. multiWatchlist in inline.js) can refresh.
+    // This is dispatched AFTER callback() so that _svAppReady has already
+    // registered its sv_mwl_changed listener before the event fires.
     if (typeof callback === "function") callback();
+
+    // ── Watchlist slot migration ──────────────────────────────────────
+    // Free tier is now 1 slot. Trim any existing user's watchlist to
+    // (1 + sv_wl_slots) total items, keeping the first item in "want",
+    // then "watching", then "done". Runs once per session after hydration.
+    try {
+      var _mwlRaw = _cache["sv_mwl"];
+      if (_mwlRaw) {
+        var _mwl = typeof _mwlRaw === "string" ? JSON.parse(_mwlRaw) : _mwlRaw;
+        var _extraSlots = parseInt(_cache["sv_wl_slots"] || "0", 10) || 0;
+        var _totalSlots = 3 + _extraSlots;
+        var _allItems = [].concat(
+          _mwl.want || [],
+          _mwl.watching || [],
+          _mwl.done || [],
+        );
+        if (_allItems.length > _totalSlots) {
+          // Keep only the allowed number of items, preserving tab grouping
+          var _kept = _allItems.slice(0, _totalSlots);
+          var _keptIds = new Set(
+            _kept.map(function (i) {
+              return i.type + "_" + i.tmdbId;
+            }),
+          );
+          var _trimmed = {
+            want: (_mwl.want || []).filter(function (i) {
+              return _keptIds.has(i.type + "_" + i.tmdbId);
+            }),
+            watching: (_mwl.watching || []).filter(function (i) {
+              return _keptIds.has(i.type + "_" + i.tmdbId);
+            }),
+            done: (_mwl.done || []).filter(function (i) {
+              return _keptIds.has(i.type + "_" + i.tmdbId);
+            }),
+          };
+          var _trimmedStr = JSON.stringify(_trimmed);
+          _cache["sv_mwl"] = _trimmedStr;
+          // Persist the trimmed list back to Firebase
+          var _fbKey = "sv_mwl";
+          set(ref(db, "users/" + uid + "/" + _fbKey), _trimmedStr).catch(
+            function () {},
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("[FirebaseDB] watchlist migration failed", e);
+    }
+
+    if (_cache["sv_mwl"]) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent("sv_mwl_changed", { detail: _cache["sv_mwl"] }),
+        );
+      } catch (e) {}
+    }
   },
 };
 

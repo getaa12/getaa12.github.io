@@ -1,3 +1,256 @@
+/* ═══════════════════════════════════════════════════════
+   SVP POINTS SYSTEM
+   Keys: sv_points (total), sv_pts_cooldown (last ad ts)
+   Earn: +10 watch ad, +5 daily login, +2 mark watched,
+         +1 rate, +3 share
+═══════════════════════════════════════════════════════ */
+
+var SVP_AD_URL = "https://ampleagency.com/key=623f28f43f36fedd521226d0964cfdf8";
+var SVP_AD_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes between ads
+
+function _svpGetPoints() {
+  try {
+    return parseInt(FirebaseDB.getItem("sv_points") || "0", 10) || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function _svpAddPoints(n, reason) {
+  if (window.SV_GUEST) return; // guests can't earn points
+  try {
+    var total = _svpGetPoints() + n;
+    FirebaseDB.setItem("sv_points", String(total));
+    _svpUpdateUI(total);
+    if (typeof showToast === "function") {
+      showToast("⭐ +" + n + " pts — " + reason + " · Total: " + total);
+    }
+  } catch (e) {}
+}
+
+function _svpUpdateUI(pts) {
+  pts = pts !== undefined ? pts : _svpGetPoints();
+  var nav = document.getElementById("navPointsDisplay");
+  if (nav) nav.textContent = pts + " pts";
+  var modal = document.getElementById("pointsModalBalance");
+  if (modal) modal.textContent = pts;
+}
+
+function _svpCooldownLeft() {
+  try {
+    var last = parseInt(FirebaseDB.getItem("sv_pts_cooldown") || "0", 10);
+    var diff = Date.now() - last;
+    return Math.max(0, SVP_AD_COOLDOWN_MS - diff);
+  } catch (e) {
+    return 0;
+  }
+}
+
+window.earnPoints = function () {
+  if (window.SV_GUEST) {
+    if (window._requireAuth) window._requireAuth("Earning points");
+    return;
+  }
+  var cooldown = _svpCooldownLeft();
+  if (cooldown > 0) {
+    var mins = Math.ceil(cooldown / 60000);
+    if (typeof showToast === "function") {
+      showToast("⏳ Please wait " + mins + " min before watching another ad.");
+    }
+    _svpUpdateCooldownMsg();
+    return;
+  }
+  // Open ad in new tab
+  window.open(SVP_AD_URL, "_blank", "noopener");
+  // Record cooldown & award points after 5s (enough time to open)
+  FirebaseDB.setItem("sv_pts_cooldown", String(Date.now()));
+  setTimeout(function () {
+    _svpAddPoints(10, "Watched ad");
+    _svpUpdateCooldownMsg();
+  }, 5000);
+};
+
+function _svpUpdateCooldownMsg() {
+  var el = document.getElementById("pointsCooldownMsg");
+  var btn = document.getElementById("pointsModalEarnBtn");
+  var navBtn = document.getElementById("earnPointsBtn");
+  if (!el) return;
+  var left = _svpCooldownLeft();
+  if (left > 0) {
+    var mins = Math.floor(left / 60000);
+    var secs = Math.floor((left % 60000) / 1000);
+    el.textContent = "Next ad available in " + mins + "m " + secs + "s";
+    if (btn) {
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "not-allowed";
+    }
+    if (navBtn) navBtn.style.opacity = "0.5";
+  } else {
+    el.textContent = "";
+    if (btn) {
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+    }
+    if (navBtn) navBtn.style.opacity = "1";
+  }
+}
+
+window.openPointsModal = function () {
+  _svpUpdateUI();
+  _svpUpdateCooldownMsg();
+  var m = document.getElementById("pointsModal");
+  if (m) m.style.display = "flex";
+  // Start live countdown
+  window._svpCountdownInterval = setInterval(_svpUpdateCooldownMsg, 1000);
+};
+
+window.closePointsModal = function () {
+  var m = document.getElementById("pointsModal");
+  if (m) m.style.display = "none";
+  clearInterval(window._svpCountdownInterval);
+};
+
+// Award points on other actions — called from inline.js events
+window._svpAwardLogin = function () {
+  _svpAddPoints(5, "Daily login");
+};
+window._svpAwardWatch = function () {
+  _svpAddPoints(2, "Marked as watched");
+};
+window._svpAwardRate = function () {
+  _svpAddPoints(1, "Rated a title");
+};
+window._svpAwardShare = function () {
+  var SHARE_MAX_PER_DAY = 2;
+  var MS_24H = 24 * 60 * 60 * 1000;
+  try {
+    var raw = FirebaseDB.getItem("sv_share_log");
+    var log = raw ? JSON.parse(raw) : { count: 0, windowStart: Date.now() };
+    var now = Date.now();
+    // Reset window if 24h have passed
+    if (now - log.windowStart >= MS_24H) {
+      log = { count: 0, windowStart: now };
+    }
+    if (log.count >= SHARE_MAX_PER_DAY) {
+      var msLeft = MS_24H - (now - log.windowStart);
+      var hLeft = Math.ceil(msLeft / 3600000);
+      if (typeof showToast === "function") {
+        showToast("⏳ Share bonus maxed out — resets in " + hLeft + "h");
+      }
+      return;
+    }
+    log.count++;
+    FirebaseDB.setItem("sv_share_log", JSON.stringify(log));
+    _svpAddPoints(
+      2,
+      "Shared a title (" + log.count + "/" + SHARE_MAX_PER_DAY + " today)",
+    );
+  } catch (e) {
+    _svpAddPoints(2, "Shared a title");
+  }
+};
+
+// Init UI on load
+document.addEventListener("DOMContentLoaded", function () {
+  setTimeout(_svpUpdateUI, 1500);
+});
+
+/* ═══ END POINTS SYSTEM ═══ */
+window.SV_GUEST = false;
+
+// Safe FirebaseDB shim — used by guest mode when Firebase isn't initialised yet
+function _ensureFirebaseDB() {
+  if (!window.FirebaseDB) {
+    window.FirebaseDB = {
+      getItem: function (k) {
+        try {
+          return localStorage.getItem(k);
+        } catch (e) {
+          return null;
+        }
+      },
+      setItem: function (k, v) {
+        try {
+          localStorage.setItem(k, v);
+        } catch (e) {}
+      },
+      removeItem: function (k) {
+        try {
+          localStorage.removeItem(k);
+        } catch (e) {}
+      },
+      key: function (i) {
+        try {
+          return localStorage.key(i);
+        } catch (e) {
+          return null;
+        }
+      },
+      get length() {
+        try {
+          return localStorage.length;
+        } catch (e) {
+          return 0;
+        }
+      },
+    };
+  }
+}
+
+window.doGuestContinue = function () {
+  window.SV_GUEST = true;
+  _ensureFirebaseDB();
+  var authScreen = document.getElementById("authScreen");
+  if (authScreen) authScreen.style.display = "none";
+  var banner = document.getElementById("guestBanner");
+  if (banner) {
+    banner.style.display = "flex";
+  }
+  var appRoot = document.getElementById("appRoot");
+  if (appRoot && appRoot.style.display === "none") appRoot.style.display = "";
+
+  // Trigger the main app boot — same thing firebase-config.js does after auth
+  if (typeof window._svAppReady === "function") {
+    window._svAppReady();
+  } else {
+    window._svAppReadyPending = true;
+  }
+};
+
+window._requireAuth = function (actionLabel) {
+  if (!window.SV_GUEST) return false;
+
+  // Show a sign-in prompt modal
+  var existing = document.getElementById("_guestAuthPrompt");
+  if (existing) existing.remove();
+
+  var modal = document.createElement("div");
+  modal.id = "_guestAuthPrompt";
+  modal.style.cssText =
+    "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px)";
+  modal.innerHTML = `
+    <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
+      <div style="font-size:36px;margin-bottom:12px">🔒</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:8px">${actionLabel || "Sign in required"}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6;margin-bottom:22px">
+        Create a free account to unlock watchlists, ratings, roulette, party mode, and more.
+      </div>
+      <button onclick="document.getElementById('_guestAuthPrompt').remove();document.getElementById('authScreen').style.display='flex';document.getElementById('guestBanner').style.display='none';"
+        style="width:100%;background:#e8622a;color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:inherit">
+        Sign In / Create Account
+      </button>
+      <button onclick="document.getElementById('_guestAuthPrompt').remove();"
+        style="width:100%;background:transparent;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.1);padding:11px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">
+        Keep Browsing as Guest
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", function (e) {
+    if (e.target === modal) modal.remove();
+  });
+  return true;
+};
+
 // ── Global stubs: keep onclick handlers safe before Firebase auth is ready ──
 // The real implementations are defined inside _svAppReady() and will
 // overwrite these automatically once the user is authenticated.
@@ -102,6 +355,46 @@
       window[name] = noop;
     }
   });
+
+  // ── Guest interceptions ──
+  var guestBlocked = {
+    // Watchlist & progress
+    toggleWatchlist: "Adding to watchlist",
+    toggleCompleted: "Marking as watched",
+    toggleWishlist: "Managing your wishlist",
+    toggleWishlistDetail: "Managing your wishlist",
+    wishlistCardClick: "Managing your wishlist",
+    moveWlItem: "Managing your watchlist",
+    removeFromMultiWl: "Managing your watchlist",
+    clearAllCW: "Continue watching history",
+    removeCW: "Continue watching history",
+    // Ratings & reviews
+    setUserRating: "Rating titles",
+    submitComment: "Posting comments",
+    deleteComment: "Deleting comments",
+    toggleReaction: "Reacting to content",
+    // Profile & goals
+    saveProfile: "Saving your profile",
+    setWatchGoal: "Setting watch goals",
+    snapCurrentContent: "Saving a snapshot",
+    // Social features
+    openWatchTogetherModal: "Watch Together (Party Mode)",
+    openWatchParty: "Watch Party",
+    // Roulette
+    openRandom: "Movie Roulette",
+    roulettePlay: "Movie Roulette",
+    // Calendar
+    openCalendarModal: "Watch Calendar",
+  };
+  Object.keys(guestBlocked).forEach(function (name) {
+    (function (n, label) {
+      var original = window[n];
+      window[n] = function () {
+        if (window._requireAuth(label)) return;
+        if (typeof original === "function") original.apply(this, arguments);
+      };
+    })(name, guestBlocked[name]);
+  });
   // checkAndUnlock must return true to allow play
   window.checkAndUnlock = function () {
     return true;
@@ -112,8 +405,467 @@
 })();
 
 /* ═══════════════════════════════════════════════════════
-   TASTE PROFILE CARD  —  global functions
+   REPOST SYSTEM — Instagram-style
+   One click on 🔁 Repost in the detail modal = instantly
+   posts that title to the Reposts tab as its own card.
+   Click again = removes it (toggle).
+   Storage key: sv_reposts_<uid>  (array, newest first)
 ═══════════════════════════════════════════════════════ */
+
+/* ── DB shim — works before Firebase inits ── */
+function _svrDB() {
+  if (window.FirebaseDB) return window.FirebaseDB;
+  return {
+    getItem: function (k) {
+      try {
+        return localStorage.getItem(k);
+      } catch (e) {
+        return null;
+      }
+    },
+    setItem: function (k, v) {
+      try {
+        localStorage.setItem(k, v);
+      } catch (e) {}
+    },
+  };
+}
+
+function _svrUid() {
+  try {
+    if (window.firebase && firebase.auth && firebase.auth().currentUser)
+      return firebase.auth().currentUser.uid;
+  } catch (e) {}
+  var k = "sv_anon_uid";
+  var id = localStorage.getItem(k);
+  if (!id) {
+    id = "anon_" + Math.random().toString(36).slice(2);
+    localStorage.setItem(k, id);
+  }
+  return id;
+}
+
+var _SVR_KEY = "sv_reposts"; // array of { id, tmdbId, type, title, poster, year, ts }
+var _SVR_MAX = 50;
+var _SVR_TMDB_CACHE = {};
+
+/* ── storage helpers ── */
+function _svrLoad() {
+  try {
+    return JSON.parse(_svrDB().getItem(_SVR_KEY) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+function _svrSave(arr) {
+  try {
+    _svrDB().setItem(_SVR_KEY, JSON.stringify(arr));
+  } catch (e) {}
+}
+function _svrIsReposted(tmdbId, type) {
+  return _svrLoad().some(function (p) {
+    return String(p.tmdbId) === String(tmdbId) && p.type === type;
+  });
+}
+
+/* ── escape HTML ── */
+function _svrEsc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+function _svrTimeAgo(ts) {
+  var d = Date.now() - ts;
+  if (d < 60000) return "just now";
+  if (d < 3600000) return Math.floor(d / 60000) + "m ago";
+  if (d < 86400000) return Math.floor(d / 3600000) + "h ago";
+  return Math.floor(d / 86400000) + "d ago";
+}
+
+/* ── Add or remove a repost (toggle) ── */
+function _svrToggleRepost(item) {
+  if (window.SV_GUEST) {
+    if (window._requireAuth) window._requireAuth("Reposting");
+    return;
+  }
+  var posts = _svrLoad();
+  var idx = -1;
+  posts.forEach(function (p, i) {
+    if (String(p.tmdbId) === String(item.tmdbId) && p.type === item.type)
+      idx = i;
+  });
+
+  if (idx !== -1) {
+    // Un-repost
+    posts.splice(idx, 1);
+    _svrSave(posts);
+    _svrUpdateBtn(item.tmdbId, item.type, false);
+    if (typeof showToast === "function") showToast("🔁 Removed from Reposts");
+  } else {
+    // Repost
+    posts.unshift({
+      id: Date.now(),
+      tmdbId: String(item.tmdbId),
+      type: item.type || "movie",
+      title: item.title || "",
+      poster: item.poster || "",
+      year: item.year || "",
+      ts: Date.now(),
+    });
+    if (posts.length > _SVR_MAX) posts = posts.slice(0, _SVR_MAX);
+    _svrSave(posts);
+    _svrUpdateBtn(item.tmdbId, item.type, true);
+    if (typeof showToast === "function")
+      showToast("🔁 Reposted to your profile!");
+  }
+  // Live-refresh feed if profile is open on Reposts tab
+  var pane = document.getElementById("profPane-reposts");
+  if (pane && pane.style.display !== "none") _svrRenderFeed();
+}
+
+/* ── Update the Repost button state in the detail modal ── */
+function _svrUpdateBtn(tmdbId, type, reposted) {
+  var btn = document.getElementById("svr-repost-btn");
+  if (!btn) return;
+  var repostIcon =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+  btn.innerHTML = repostIcon + (reposted ? " Reposted" : " Repost");
+  btn.style.background = reposted
+    ? "rgba(232,98,42,0.18)"
+    : "rgba(255,255,255,0.06)";
+  btn.style.borderColor = reposted
+    ? "rgba(232,98,42,0.55)"
+    : "rgba(255,255,255,0.12)";
+  btn.style.color = reposted ? "#e8622a" : "rgba(255,255,255,0.75)";
+}
+
+/* ── Fetch poster from TMDB if not stored ── */
+function _svrFetchPoster(tmdbId, type, imgEl, fallbackEl) {
+  if (!tmdbId) return;
+  var cacheKey = tmdbId + "_" + type;
+  if (_SVR_TMDB_CACHE[cacheKey]) {
+    imgEl.src = "https://image.tmdb.org/t/p/w185" + _SVR_TMDB_CACHE[cacheKey];
+    return;
+  }
+  fetch(
+    "https://api.themoviedb.org/3/" +
+      (type === "tv" ? "tv" : "movie") +
+      "/" +
+      tmdbId +
+      "?api_key=8265bd1679663a7ea12ac168da84d2e8",
+  )
+    .then(function (r) {
+      return r.ok ? r.json() : null;
+    })
+    .then(function (d) {
+      if (d && d.poster_path) {
+        _SVR_TMDB_CACHE[cacheKey] = d.poster_path;
+        imgEl.src = "https://image.tmdb.org/t/p/w185" + d.poster_path;
+        // Persist poster back into storage so next render is instant
+        var posts = _svrLoad();
+        posts.forEach(function (p) {
+          if (
+            String(p.tmdbId) === String(tmdbId) &&
+            p.type === type &&
+            !p.poster
+          )
+            p.poster = d.poster_path;
+        });
+        _svrSave(posts);
+      } else {
+        if (fallbackEl) fallbackEl.style.display = "flex";
+      }
+    })
+    .catch(function () {
+      if (fallbackEl) fallbackEl.style.display = "flex";
+    });
+}
+
+/* ── Render the Reposts feed — 3-col mini cards ── */
+function _svrRenderFeed() {
+  var feed = document.getElementById("profRepostFeed");
+  if (!feed) return;
+  var posts = _svrLoad();
+  feed.innerHTML = "";
+
+  if (!posts.length) {
+    feed.innerHTML =
+      '<div style="text-align:center;padding:36px 0 16px;color:rgba(255,255,255,0.2);font-size:13px;line-height:1.9">' +
+      '<div style="font-size:28px;margin-bottom:6px">🔁</div>' +
+      "No reposts yet<br>" +
+      '<span style="font-size:11px;opacity:0.5">Tap 🔁 Repost on any movie or series</span></div>';
+    return;
+  }
+
+  /* Group into rows of 3 */
+  var rows = [];
+  for (var i = 0; i < posts.length; i += 3) rows.push(posts.slice(i, i + 3));
+
+  rows.forEach(function (row) {
+    var rowEl = document.createElement("div");
+    rowEl.style.cssText =
+      "display:grid;grid-template-columns:repeat(3,1fr);gap:4px";
+
+    row.forEach(function (post) {
+      /* ── cell ── */
+      var cell = document.createElement("div");
+      cell.style.cssText =
+        "position:relative;height:120px;border-radius:8px;overflow:hidden;" +
+        "background:#111;cursor:pointer;flex-shrink:0";
+
+      /* gradient fallback */
+      var gradBgs = ["#1c1c3a", "#1e2e1e", "#2a1c1c", "#1a2530", "#2a1e30"];
+      var gIdx =
+        Math.abs(
+          (post.tmdbId || "").split("").reduce(function (a, c) {
+            return a + c.charCodeAt(0);
+          }, 0),
+        ) % gradBgs.length;
+      var fallback = document.createElement("div");
+      fallback.style.cssText =
+        "position:absolute;inset:0;background:linear-gradient(160deg," +
+        gradBgs[gIdx] +
+        ",#0c0c18);" +
+        "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px";
+      fallback.innerHTML =
+        '<span style="font-size:20px">🎬</span>' +
+        '<span style="font-size:8px;font-weight:600;color:rgba(255,255,255,0.5);text-align:center;line-height:1.3;word-break:break-word">' +
+        _svrEsc(
+          post.title.length > 22 ? post.title.slice(0, 20) + "…" : post.title,
+        ) +
+        "</span>";
+
+      /* poster image */
+      var img = document.createElement("img");
+      img.alt = post.title;
+      img.style.cssText =
+        "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" +
+        "transition:transform .25s;display:none";
+      img.onload = function () {
+        img.style.display = "block";
+        fallback.style.display = "none";
+      };
+      img.onerror = function () {
+        img.style.display = "none";
+        fallback.style.display = "flex";
+      };
+
+      if (post.poster) {
+        img.src = "https://image.tmdb.org/t/p/w185" + post.poster;
+      } else if (post.tmdbId) {
+        _svrFetchPoster(post.tmdbId, post.type, img, fallback);
+      }
+
+      /* dark gradient + title overlay at bottom */
+      var overlay = document.createElement("div");
+      overlay.style.cssText =
+        "position:absolute;bottom:0;left:0;right:0;" +
+        "background:linear-gradient(transparent,rgba(0,0,0,0.88));" +
+        "padding:20px 5px 5px;pointer-events:none";
+      overlay.innerHTML =
+        '<div style="font-size:8px;font-weight:700;color:#fff;line-height:1.2;' +
+        'overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' +
+        _svrEsc(post.title) +
+        "</div>" +
+        (post.year
+          ? '<div style="font-size:7.5px;color:rgba(255,255,255,0.4);margin-top:1px">' +
+            post.year +
+            "</div>"
+          : "");
+
+      /* type badge top-left */
+      var badge = document.createElement("div");
+      badge.style.cssText =
+        "position:absolute;top:4px;left:4px;" +
+        "background:" +
+        (post.type === "tv" ? "#1e6fff" : "#e8622a") +
+        ";" +
+        "color:#fff;font-size:7px;font-weight:800;padding:1px 5px;" +
+        "border-radius:3px;letter-spacing:0.04em;line-height:1.6";
+      badge.textContent = post.type === "tv" ? "TV" : "MV";
+
+      /* delete button top-right */
+      var del = document.createElement("button");
+      del.style.cssText =
+        "position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.55);" +
+        "border:none;color:rgba(255,255,255,0.6);font-size:9px;width:18px;height:18px;" +
+        "border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;" +
+        "line-height:1;opacity:0;transition:opacity .15s";
+      del.textContent = "✕";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        window.deleteRepost(post.id);
+      });
+      cell.addEventListener("mouseenter", function () {
+        img.style.transform = "scale(1.06)";
+        del.style.opacity = "1";
+      });
+      cell.addEventListener("mouseleave", function () {
+        img.style.transform = "scale(1)";
+        del.style.opacity = "0";
+      });
+
+      /* click opens detail modal */
+      cell.addEventListener("click", function () {
+        window._svrOpenItem(post);
+      });
+
+      cell.appendChild(fallback);
+      cell.appendChild(img);
+      cell.appendChild(overlay);
+      cell.appendChild(badge);
+      cell.appendChild(del);
+      rowEl.appendChild(cell);
+    });
+
+    /* fill empty slots in last row so grid stays aligned */
+    while (rowEl.children.length < 3) {
+      var empty = document.createElement("div");
+      empty.style.cssText =
+        "height:120px;border-radius:8px;background:rgba(255,255,255,0.02)";
+      rowEl.appendChild(empty);
+    }
+
+    feed.appendChild(rowEl);
+  });
+}
+
+/* ── Inject 🔁 Repost button into the detail modal ── */
+document.addEventListener("DOMContentLoaded", function () {
+  var detailBody = document.getElementById("detailBody");
+  if (!detailBody) return;
+
+  var observer = new MutationObserver(function () {
+    if (document.getElementById("svr-repost-btn")) return;
+
+    var actionRow = detailBody.querySelector(
+      ".detail-actions, .detail-btn-row, [class*='action']",
+    );
+    if (!actionRow) {
+      var btns = detailBody.querySelectorAll("button");
+      if (btns.length) actionRow = btns[0].parentElement;
+    }
+    if (!actionRow) return;
+
+    var titleEl = document.getElementById("detailTitle");
+    var title = titleEl ? titleEl.textContent.trim() : "";
+    if (!title || title === "—") return;
+
+    /* Read item from exposed global */
+    var ci = window._svCurrentItem || null;
+    if (!ci || !ci.tmdbId) return;
+
+    var reposted = _svrIsReposted(ci.tmdbId, ci.type);
+    var repostIcon =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+
+    var btn = document.createElement("button");
+    btn.id = "svr-repost-btn";
+    btn.title = "Repost to your profile";
+    btn.style.cssText = [
+      "display:inline-flex",
+      "align-items:center",
+      "gap:6px",
+      "padding:8px 14px",
+      "border-radius:10px",
+      "border:1px solid",
+      "font-size:13px",
+      "font-weight:600",
+      "cursor:pointer",
+      "font-family:inherit",
+      "transition:all .2s",
+      "white-space:nowrap",
+      "background:" +
+        (reposted ? "rgba(232,98,42,0.18)" : "rgba(255,255,255,0.06)"),
+      "border-color:" +
+        (reposted ? "rgba(232,98,42,0.55)" : "rgba(255,255,255,0.12)"),
+      "color:" + (reposted ? "#e8622a" : "rgba(255,255,255,0.75)"),
+    ].join(";");
+    btn.innerHTML = repostIcon + (reposted ? " Reposted" : " Repost");
+
+    btn.addEventListener("click", function () {
+      var item = window._svCurrentItem || ci;
+      _svrToggleRepost({
+        tmdbId: item.tmdbId || item.id,
+        type: item.type || "movie",
+        title: item.title || title,
+        poster: item.poster || item.poster_path || "",
+        year: item.year || "",
+      });
+    });
+
+    actionRow.insertBefore(btn, actionRow.firstChild);
+  });
+
+  observer.observe(detailBody, { childList: true, subtree: true });
+});
+
+/* ── Public API ── */
+window.switchProfTab = function (tab) {
+  ["about", "reposts"].forEach(function (t) {
+    var pane = document.getElementById("profPane-" + t);
+    var btn = document.getElementById("profTab-" + t);
+    if (!pane || !btn) return;
+    var active = t === tab;
+    pane.style.display = active ? "" : "none";
+    btn.style.borderBottomColor = active ? "#e8622a" : "transparent";
+    btn.style.color = active ? "#fff" : "rgba(255,255,255,0.35)";
+    btn.style.fontWeight = active ? "700" : "600";
+  });
+  if (tab === "reposts") _svrRenderFeed();
+};
+
+window.deleteRepost = function (id) {
+  var posts = _svrLoad().filter(function (p) {
+    return p.id !== id;
+  });
+  _svrSave(posts);
+  _svrRenderFeed();
+  if (typeof showToast === "function") showToast("🗑 Removed from Reposts");
+};
+
+window._refreshRepostFeed = function () {
+  _svrRenderFeed();
+};
+
+/* ── Open detail modal from a repost card tap ── */
+window._svrOpenItem = function (item) {
+  try {
+    if (!item || !item.tmdbId) return;
+    if (window.allContent && window.allContent.length) {
+      var found = window.allContent.find(function (c) {
+        return String(c.tmdbId) === String(item.tmdbId) && c.type === item.type;
+      });
+      if (found && typeof window.openContent === "function") {
+        // Close profile modal first
+        if (typeof window.closeProfileModal === "function")
+          window.closeProfileModal();
+        window.openContent(found);
+        return;
+      }
+    }
+    // Fallback via URL
+    window.history.pushState(
+      null,
+      "",
+      "?type=" + item.type + "&id=" + item.tmdbId,
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  } catch (e) {}
+};
+
+/* Keep legacy stubs so nothing else breaks */
+window.openFavRepost = function () {};
+window.closeFavRepost = function () {};
+window.addFavRepost = function () {};
+window.removeFavRepost = function () {};
+window.repostFavorites = function () {};
+window.quickRepostTitle = function () {};
+window.setFavMood = function () {};
+
+/* ═══ END REPOST SYSTEM ═══ */
 
 (function () {
   /* ── personality archetypes ── */
@@ -689,3 +1441,301 @@
     setTimeout(() => resetBtn("tasteShareBtn"), 3000);
   }
 })();
+
+/* ═══════════════════════════════════════════════════════════════
+   UID COPY
+   Populates the UID row in the profile modal and handles copy.
+═══════════════════════════════════════════════════════════════ */
+window.svPopulateUid = function () {
+  var uid = window._svUid || (window._svUser && window._svUser.uid) || null;
+  var row = document.getElementById("profileUidRow");
+  var txt = document.getElementById("profileUidText");
+  if (!row) return;
+  if (!uid) {
+    row.style.display = "none";
+    return;
+  }
+  row.style.display = "flex";
+  if (txt) txt.textContent = uid;
+};
+
+window.svCopyUid = function () {
+  var uid = window._svUid || (window._svUser && window._svUser.uid) || "";
+  if (!uid) return;
+  try {
+    navigator.clipboard.writeText(uid).then(function () {
+      var btn = document.getElementById("profileUidCopyBtn");
+      if (btn) {
+        btn.textContent = "✓ Copied!";
+        btn.style.color = "#4ade80";
+        btn.style.borderColor = "rgba(74,222,128,0.3)";
+        setTimeout(function () {
+          btn.textContent = "Copy UID";
+          btn.style.color = "";
+          btn.style.borderColor = "";
+        }, 2000);
+      }
+    });
+  } catch (e) {
+    /* Fallback for older browsers */
+    var el = document.createElement("textarea");
+    el.value = uid;
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    el.remove();
+    if (typeof showToast === "function")
+      showToast("✓ UID copied to clipboard!");
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   GIFT POINTS SYSTEM
+   Flow:
+     1. Sender pastes recipient UID
+     2. Picks amount (must have enough pts)
+     3. svSendGift() verifies, deducts from sender, adds to recipient
+        via direct Firebase RTDB write to users/{recipientUid}/sv_points
+     4. Also writes a gift notification to gifts/{recipientUid}/{pushKey}
+        so the recipient sees a toast on their next login
+═══════════════════════════════════════════════════════════════ */
+
+window.openGiftPointsModal = function () {
+  var m = document.getElementById("giftPointsModal");
+  if (!m) return;
+  // Reset state
+  var uid_in = document.getElementById("giftUidInput");
+  var amt_in = document.getElementById("giftAmtInput");
+  var err = document.getElementById("giftPointsError");
+  if (uid_in) uid_in.value = "";
+  if (amt_in) amt_in.value = "";
+  if (err) {
+    err.style.display = "none";
+    err.textContent = "";
+  }
+  // Update balance display
+  var bal = typeof _svpGetPoints === "function" ? _svpGetPoints() : 0;
+  var balEl = document.getElementById("giftMyBalance");
+  if (balEl) balEl.textContent = "⭐ " + bal + " pts";
+  m.style.display = "flex";
+};
+
+window.closeGiftPointsModal = function () {
+  var m = document.getElementById("giftPointsModal");
+  if (m) m.style.display = "none";
+};
+
+window.svGiftSetAmt = function (n) {
+  var inp = document.getElementById("giftAmtInput");
+  if (inp) {
+    inp.value = n;
+    inp.focus();
+  }
+  // Highlight the selected preset button
+  document.querySelectorAll(".gift-amt-btn").forEach(function (b) {
+    var isActive = parseInt(b.textContent, 10) === n;
+    b.style.background = isActive
+      ? "rgba(232,98,42,0.2)"
+      : "rgba(255,255,255,0.05)";
+    b.style.borderColor = isActive
+      ? "rgba(232,98,42,0.5)"
+      : "rgba(255,255,255,0.1)";
+    b.style.color = isActive ? "#e8622a" : "rgba(255,255,255,0.6)";
+  });
+};
+
+function _giftShowError(msg) {
+  var err = document.getElementById("giftPointsError");
+  if (!err) return;
+  err.textContent = msg;
+  err.style.display = "block";
+}
+function _giftHideError() {
+  var err = document.getElementById("giftPointsError");
+  if (err) err.style.display = "none";
+}
+
+window.svSendGift = function () {
+  _giftHideError();
+
+  if (window.SV_GUEST) {
+    if (window._requireAuth) window._requireAuth("Gifting points");
+    return;
+  }
+
+  var senderUid = window._svUid || (window._svUser && window._svUser.uid);
+  if (!senderUid) {
+    _giftShowError("You must be signed in to gift points.");
+    return;
+  }
+
+  var recipientUid = (
+    document.getElementById("giftUidInput").value || ""
+  ).trim();
+  if (!recipientUid) {
+    _giftShowError("Please enter the recipient's UID.");
+    return;
+  }
+  if (recipientUid === senderUid) {
+    _giftShowError("You can't gift points to yourself!");
+    return;
+  }
+
+  var amount = parseInt(document.getElementById("giftAmtInput").value, 10);
+  if (!amount || amount < 1) {
+    _giftShowError("Enter a valid amount (minimum 1 pt).");
+    return;
+  }
+  if (amount > 10000) {
+    _giftShowError("Maximum gift is 10,000 pts at once.");
+    return;
+  }
+
+  var bal = typeof _svpGetPoints === "function" ? _svpGetPoints() : 0;
+  if (bal < amount) {
+    _giftShowError("Not enough points. You have " + bal + " pts.");
+    return;
+  }
+
+  /* Verify recipient exists in Firebase before deducting */
+  var btn = document.getElementById("giftSendBtn");
+  if (btn) {
+    btn.textContent = "Sending…";
+    btn.style.opacity = "0.6";
+    btn.disabled = true;
+  }
+
+  var rtdb = window._firebaseRTDB;
+  if (!rtdb) {
+    _giftShowError("Firebase not ready — please try again.");
+    _giftResetBtn();
+    return;
+  }
+
+  var recipientRef = rtdb.ref(
+    rtdb.getDatabase(),
+    "users/" + recipientUid + "/sv_points",
+  );
+
+  rtdb
+    .get(recipientRef)
+    .then(function (snap) {
+      /* Recipient must exist (any key under users/{uid} is fine — we check sv_points or fall back to 0) */
+      var recipientPts = snap.exists() ? parseInt(snap.val(), 10) || 0 : null;
+
+      /* If recipient node doesn't exist at all they may have no points key yet — check parent */
+      var parentRef = rtdb.ref(rtdb.getDatabase(), "users/" + recipientUid);
+      return rtdb.get(parentRef).then(function (parentSnap) {
+        if (!parentSnap.exists()) {
+          throw new Error(
+            "Recipient UID not found. Double-check and try again.",
+          );
+        }
+        /* Deduct from sender */
+        var newSenderBal = bal - amount;
+        FirebaseDB.setItem("sv_points", String(newSenderBal));
+        if (typeof _svpUpdateUI === "function") _svpUpdateUI(newSenderBal);
+
+        /* Add to recipient directly in RTDB */
+        var addPts = (recipientPts !== null ? recipientPts : 0) + amount;
+        return rtdb.set(recipientRef, addPts).then(function () {
+          /* Write gift notification for recipient */
+          var notifRef = rtdb.ref(rtdb.getDatabase(), "gifts/" + recipientUid);
+          var senderName =
+            (window._svProfile && window._svProfile.name) || "Someone";
+          var senderBadge =
+            (window._svProfile && window._svProfile.badge) || "🎬";
+          /* push() equivalent via timestamp key */
+          var notifKey = "gift_" + Date.now();
+          var notifKeyRef = rtdb.ref(
+            rtdb.getDatabase(),
+            "gifts/" + recipientUid + "/" + notifKey,
+          );
+          return rtdb.set(notifKeyRef, {
+            from: senderName,
+            fromBadge: senderBadge,
+            amount: amount,
+            ts: Date.now(),
+          });
+        });
+      });
+    })
+    .then(function () {
+      window.closeGiftPointsModal();
+      if (typeof showToast === "function") {
+        showToast("🎁 Gift sent! " + amount + " pts on their way.");
+      }
+      _giftResetBtn();
+    })
+    .catch(function (e) {
+      _giftShowError(e.message || "Something went wrong. Please try again.");
+      _giftResetBtn();
+    });
+};
+
+function _giftResetBtn() {
+  var btn = document.getElementById("giftSendBtn");
+  if (btn) {
+    btn.textContent = "Send Gift 🎁";
+    btn.style.opacity = "1";
+    btn.disabled = false;
+  }
+}
+
+/* Close gift modal on backdrop click */
+document.addEventListener("DOMContentLoaded", function () {
+  var m = document.getElementById("giftPointsModal");
+  if (m) {
+    m.addEventListener("click", function (e) {
+      if (e.target === m) window.closeGiftPointsModal();
+    });
+  }
+});
+
+/* ── Check for pending gift notifications on login ── */
+window._svCheckGiftNotifs = function () {
+  var uid = window._svUid || (window._svUser && window._svUser.uid);
+  if (!uid || window.SV_GUEST) return;
+  var rtdb = window._firebaseRTDB;
+  if (!rtdb) return;
+  var giftsRef = rtdb.ref(rtdb.getDatabase(), "gifts/" + uid);
+  rtdb
+    .get(giftsRef)
+    .then(function (snap) {
+      if (!snap.exists()) return;
+      var gifts = snap.val();
+      var totalGifted = 0;
+      var giftMessages = [];
+      Object.values(gifts).forEach(function (g) {
+        totalGifted += g.amount || 0;
+        giftMessages.push(
+          (g.fromBadge || "🎁") +
+            " " +
+            (g.from || "Someone") +
+            " gifted you " +
+            g.amount +
+            " pts!",
+        );
+      });
+      if (totalGifted > 0) {
+        /* Credit the points */
+        var cur = typeof _svpGetPoints === "function" ? _svpGetPoints() : 0;
+        FirebaseDB.setItem("sv_points", String(cur + totalGifted));
+        if (typeof _svpUpdateUI === "function") _svpUpdateUI(cur + totalGifted);
+        /* Show toasts (staggered) */
+        giftMessages.forEach(function (msg, i) {
+          setTimeout(
+            function () {
+              if (typeof showToast === "function") showToast("🎁 " + msg);
+            },
+            2500 + i * 1800,
+          );
+        });
+        /* Clear claimed notifications */
+        rtdb.remove(giftsRef).catch(function () {});
+      }
+    })
+    .catch(function () {});
+};

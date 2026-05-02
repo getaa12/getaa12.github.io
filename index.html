@@ -49,12 +49,21 @@
 <link rel="stylesheet" href="style.css">
 <script type="module" src="firebase-config.js"></script>
 <script src="app.js"></script>
-
+<script src="shop.js"></script>
 <!-- ═══ TASTE CARD BLOB + LAYOUT FIXES ═══ -->
 
 
   <link rel="stylesheet" href="inline.css">
   <script defer src="inline.js"></script>
+  <style>
+    .auth-guest-divider{display:flex;align-items:center;gap:10px;margin:4px 0 0;color:rgba(255,255,255,0.25);font-size:12px;letter-spacing:0.05em;text-transform:uppercase}
+    .auth-guest-divider::before,.auth-guest-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.1)}
+    .auth-guest-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px 16px;background:transparent;border:1px dashed rgba(255,255,255,0.18);border-radius:10px;color:rgba(255,255,255,0.5);font-size:14px;font-weight:500;cursor:pointer;transition:border-color 0.2s,color 0.2s,background 0.2s;font-family:inherit}
+    .auth-guest-btn:hover{border-color:rgba(255,255,255,0.35);color:rgba(255,255,255,0.75);background:rgba(255,255,255,0.04)}
+    .auth-guest-notice{display:flex;align-items:flex-start;gap:7px;background:rgba(232,98,42,0.08);border:1px solid rgba(232,98,42,0.2);border-radius:8px;padding:9px 12px;color:rgba(255,255,255,0.5);font-size:12px;line-height:1.5}
+    .auth-guest-notice strong{color:rgba(232,98,42,0.85)}
+    #guestBanner.visible{display:flex!important}
+  </style>
 </head>
 <body>
 <!-- ═══ LOADING SCREEN — painted instantly on every refresh ═══ -->
@@ -122,6 +131,16 @@
         </svg>
         <span>Continue with Google</span>
       </button>
+      <!-- Guest access -->
+      <div class="auth-guest-divider"><span>just browsing?</span></div>
+      <button class="auth-guest-btn" onclick="doGuestContinue()" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span>Continue as Guest</span>
+      </button>
+      <div class="auth-guest-notice">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Guest mode is <strong>view only</strong> — watchlists, ratings, and progress won't be saved.</span>
+      </div>
     </div>
 
     <!-- Sign Up Form -->
@@ -151,8 +170,26 @@
         </svg>
         <span>Continue with Google</span>
       </button>
+      <!-- Guest access -->
+      <div class="auth-guest-divider"><span>just browsing?</span></div>
+      <button class="auth-guest-btn" onclick="doGuestContinue()" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span>Continue as Guest</span>
+      </button>
+      <div class="auth-guest-notice">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Guest mode is <strong>view only</strong> — watchlists, ratings, and progress won't be saved.</span>
+      </div>
     </div>
   </div>
+</div>
+
+<!-- ═══ GUEST MODE BANNER ═══ -->
+<div id="guestBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;background:linear-gradient(90deg,#1a1a2e,#16213e);border-top:1px solid rgba(232,98,42,0.35);padding:10px 20px;align-items:center;gap:12px;flex-wrap:wrap">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8622a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <span style="color:rgba(255,255,255,0.75);font-size:13px;flex:1;min-width:200px">You're browsing as a <strong style="color:#e8622a">Guest</strong> — watchlists, ratings &amp; progress won't be saved.</span>
+  <button onclick="document.getElementById('authScreen').style.display='flex';document.getElementById('guestBanner').style.display='none';" style="background:#e8622a;color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Sign In / Sign Up</button>
+  <button onclick="document.getElementById('guestBanner').style.display='none'" style="background:transparent;color:rgba(255,255,255,0.4);border:none;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">&times;</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -182,7 +219,14 @@
       </div>
     </div>
 
-    <div class="profile-body">
+    <!-- Profile Tabs -->
+    <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.07);margin:0 0 0 0">
+      <button id="profTab-about" onclick="switchProfTab('about')" style="flex:1;padding:12px 0;background:none;border:none;border-bottom:2px solid #e8622a;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s">About</button>
+      <button id="profTab-reposts" onclick="switchProfTab('reposts')" style="flex:1;padding:12px 0;background:none;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,0.35);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s">❤️ Reposts</button>
+    </div>
+
+    <!-- TAB: About -->
+    <div id="profPane-about" class="profile-body">
       <!-- Stats -->
       <div class="profile-stats-row" id="profileStatsRow">
         <div class="profile-stat"><div class="profile-stat-val" id="statWatched">0</div><div class="profile-stat-lbl">Watched</div></div>
@@ -223,7 +267,26 @@
         <span class="taste-card-trigger-badge">VIRAL</span>
       </button>
 
+      <!-- UID copy row -->
+      <div id="profileUidRow" style="display:none;align-items:center;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:9px 13px;margin-top:2px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        <span style="font-size:11px;color:rgba(255,255,255,0.3);flex:1;font-family:'JetBrains Mono',monospace;letter-spacing:0.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="profileUidText">—</span>
+        <button onclick="svCopyUid()" title="Copy your UID" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s" id="profileUidCopyBtn">Copy UID</button>
+      </div>
+
+      <!-- Gift Points button -->
+      <button onclick="openGiftPointsModal()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 0;border-radius:11px;border:1px solid rgba(232,98,42,0.3);background:rgba(232,98,42,0.08);color:#e8622a;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;margin-top:2px">
+        🎁 Gift Points to a Friend
+      </button>
+
       <button class="profile-sign-out" onclick="doSignOut()">Sign Out</button>
+    </div>
+
+    <!-- TAB: Reposts -->
+    <div id="profPane-reposts" style="display:none;padding:12px 16px 20px;display:none">
+      <div id="profRepostFeed" style="display:flex;flex-direction:column;gap:10px">
+        <div style="text-align:center;padding:32px 0;color:rgba(255,255,255,0.2);font-size:13px">No reposts yet — tap 🔁 on any movie or series!</div>
+      </div>
     </div>
   </div>
 </div>
@@ -607,6 +670,12 @@
       Watchlist <span class="wl-count" id="wlCount">0</span>
     </button>
 
+    <!-- Points display -->
+    <button onclick="openPointsModal()" title="Your SVP Points" id="navPointsBtn" style="display:flex;align-items:center;gap:5px;background:rgba(245,197,24,0.12);border:1px solid rgba(245,197,24,0.25);border-radius:20px;padding:5px 12px;cursor:pointer;color:#f5c518;font-size:13px;font-weight:700;white-space:nowrap;transition:background 0.2s">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="#f5c518"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span id="navPointsDisplay">0 pts</span>
+    </button>
+
     <!-- Notifications -->
     <button class="notif-btn" onclick="toggleNotifPanel()" title="Notifications" id="notifBtn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -963,6 +1032,10 @@
           Full Page
         </button>
         <button id="lightsBtn" onclick="toggleTheaterMode()" title="Theater mode" style="font-size:11px;padding:5px 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted);cursor:pointer;white-space:nowrap;">💡 Lights Out</button>
+        <button onclick="earnPoints()" id="earnPointsBtn" title="Watch a short ad to earn points" style="font-size:11px;padding:5px 12px;background:linear-gradient(135deg,#f5c518,#e8a000);border:none;border-radius:6px;color:#000;cursor:pointer;white-space:nowrap;font-weight:700;display:flex;align-items:center;gap:5px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span id="earnPointsBtnLabel">+10 pts</span>
+        </button>
       </div>
     </div>
   </div>
@@ -986,12 +1059,48 @@
 <!-- ===== ROULETTE OVERLAY ===== -->
 <div id="roulette-overlay">
   <div class="roulette-title">🎲 Random Picker</div>
+  <div id="roulettePlusPanel" class="roulette-plus-gate" style="display:none;margin-bottom:14px;width:100%;max-width:460px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px">
+      <select id="rouletteGenreFilter" style="padding:6px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:#1a1a2e;color:#f0f0f5;font-size:12px;font-family:inherit;cursor:pointer">
+        <option value="">🎭 Any Genre</option>
+        <option value="Action">Action</option>
+        <option value="Comedy">Comedy</option>
+        <option value="Drama">Drama</option>
+        <option value="Horror">Horror</option>
+        <option value="Sci-Fi">Sci-Fi</option>
+        <option value="Thriller">Thriller</option>
+        <option value="Romance">Romance</option>
+        <option value="Animation">Animation</option>
+        <option value="Documentary">Documentary</option>
+        <option value="Fantasy">Fantasy</option>
+        <option value="Crime">Crime</option>
+        <option value="Adventure">Adventure</option>
+      </select>
+      <select id="rouletteTypeFilter" style="padding:6px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:#1a1a2e;color:#f0f0f5;font-size:12px;font-family:inherit;cursor:pointer">
+        <option value="">🎬 Any Type</option>
+        <option value="movie">Movies Only</option>
+        <option value="tv">Series Only</option>
+      </select>
+      <select id="rouletteMoodFilter" style="padding:6px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.15);background:#1a1a2e;color:#f0f0f5;font-size:12px;font-family:inherit;cursor:pointer">
+        <option value="">😶 Any Mood</option>
+        <option value="feel-good">😊 Feel-Good</option>
+        <option value="intense">😤 Intense</option>
+        <option value="chill">😌 Chill</option>
+        <option value="mind-bending">🤯 Mind-Bending</option>
+        <option value="scary">😱 Scary</option>
+      </select>
+    </div>
+    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.3)">🎰 Roulette+ — genre, type &amp; mood filters</div>
+  </div>
   <div class="roulette-strip-wrap">
     <div class="roulette-selector"></div>
     <div class="roulette-strip" id="rouletteStrip"></div>
   </div>
   <div class="roulette-result" id="rouletteResult"></div>
-  <button class="btn btn-primary" id="roulettePlayBtn" style="display:none" onclick="roulettePlay()"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg> Watch Now</button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center">
+    <button class="btn btn-primary" id="roulettePlayBtn" style="display:none" onclick="roulettePlay()"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg> Watch Now</button>
+    <button class="btn btn-primary" id="rouletteSpinBtn" onclick="openRandom()" style="background:rgba(232,98,42,.15);border:1px solid rgba(232,98,42,.4);color:#e8622a">🎲 Spin Again</button>
+  </div>
   <span class="roulette-close" onclick="closeRoulette()">✕ Close</span>
 </div>
 
@@ -1257,7 +1366,160 @@
   </div>
 </div>
 <!-- ═══ END SHARE BANNER MODAL ═══ -->
+
+<!-- ═══ FAVORITE REPOST MODAL ═══ -->
+<div id="favRepostModal" style="display:none;position:fixed;inset:0;z-index:10700;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px)" onclick="if(event.target===this)closeFavRepost()">
+  <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:22px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,0.7)">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:22px 22px 0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">❤️</span>
+        <div>
+          <div style="font-size:17px;font-weight:800;color:#fff;font-family:Georgia,serif">My Favorite Movies</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.35);margin-top:2px">Pin &amp; share what you love</div>
+        </div>
+      </div>
+      <button onclick="closeFavRepost()" style="background:rgba(255,255,255,0.07);border:none;color:rgba(255,255,255,0.5);width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">&times;</button>
+    </div>
+
+    <!-- Add movie input -->
+    <div style="padding:18px 22px 0">
+      <div style="background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;padding:14px 16px">
+        <div style="font-size:11px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">📌 Pin a favorite</div>
+        <div style="display:flex;gap:8px">
+          <input id="favRepostInput" type="text" placeholder="Movie or series title…" maxlength="80"
+            style="flex:1;background:transparent;border:none;color:#fff;font-size:14px;font-family:inherit;outline:none;caret-color:#e8622a"
+            onkeydown="if(event.key==='Enter')addFavRepost()" />
+          <button onclick="addFavRepost()" style="background:#e8622a;border:none;color:#fff;padding:7px 14px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">+ Add</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="favRepostEmojiRow">
+          <span style="font-size:11px;color:rgba(255,255,255,0.25);align-self:center">Mood:</span>
+          <button class="fav-mood-btn" data-mood="🔥" onclick="setFavMood(this)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer">🔥</button>
+          <button class="fav-mood-btn" data-mood="😭" onclick="setFavMood(this)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer">😭</button>
+          <button class="fav-mood-btn" data-mood="🤯" onclick="setFavMood(this)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer">🤯</button>
+          <button class="fav-mood-btn" data-mood="😂" onclick="setFavMood(this)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer">😂</button>
+          <button class="fav-mood-btn" data-mood="💀" onclick="setFavMood(this)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer">💀</button>
+          <button class="fav-mood-btn" data-mood="✨" onclick="setFavMood(this)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:14px;cursor:pointer">✨</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pinned list -->
+    <div style="padding:14px 22px 0">
+      <div style="font-size:11px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Your Pinned Favorites <span id="favRepostCount" style="color:#e8622a"></span></div>
+      <div id="favRepostList" style="display:flex;flex-direction:column;gap:8px;min-height:48px">
+        <div id="favRepostEmpty" style="text-align:center;padding:22px 0;color:rgba(255,255,255,0.2);font-size:13px">Nothing pinned yet — add your first favorite above ☝️</div>
+      </div>
+    </div>
+
+    <!-- Share / Repost bar -->
+    <div style="padding:18px 22px 22px;display:flex;gap:10px;flex-wrap:wrap">
+      <button onclick="repostFavorites('copy')" style="flex:1;min-width:120px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.75);padding:11px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📋 Copy List</button>
+      <button onclick="repostFavorites('share')" style="flex:1;min-width:120px;background:linear-gradient(135deg,#e8622a,#c0392b);border:none;color:#fff;padding:11px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔁 Repost Favorites</button>
+    </div>
+  </div>
+</div>
+<!-- ═══ END FAVORITE REPOST MODAL ═══ -->
+
+<!-- ═══ POINTS MODAL ═══ -->
+<div id="pointsModal" style="display:none;position:fixed;inset:0;z-index:10600;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px)" onclick="if(event.target===this)closePointsModal()">
+  <div style="background:#1a1a2e;border:1px solid rgba(245,197,24,0.2);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#f5c518"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span style="font-size:18px;font-weight:800;color:#fff">SVP Points</span>
+      </div>
+      <button onclick="closePointsModal()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:20px;cursor:pointer">&times;</button>
+    </div>
+
+    <!-- Balance -->
+    <div style="background:linear-gradient(135deg,rgba(245,197,24,0.15),rgba(245,197,24,0.05));border:1px solid rgba(245,197,24,0.2);border-radius:14px;padding:20px;text-align:center;margin-bottom:20px">
+      <div style="font-size:42px;font-weight:800;color:#f5c518;line-height:1" id="pointsModalBalance">0</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.4);margin-top:4px">Total Points Earned</div>
+    </div>
+
+    <!-- How to earn -->
+    <div style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">How to earn</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px">📺 Watch an ad</span>
+        <span style="color:#f5c518;font-weight:700;font-size:13px">+10 pts</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px">📅 Daily login</span>
+        <span style="color:#f5c518;font-weight:700;font-size:13px">+5 pts</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px">✅ Mark as watched</span>
+        <span style="color:#f5c518;font-weight:700;font-size:13px">+2 pts</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px">⭐ Rate a title</span>
+        <span style="color:#f5c518;font-weight:700;font-size:13px">+1 pt</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px">🔗 Share a title <span style="color:rgba(255,255,255,0.3)">(×2/day)</span></span>
+        <span style="color:#f5c518;font-weight:700;font-size:13px">+2 pts</span>
+      </div>
+    </div>
+
+    <!-- Earn now CTA -->
+    <button onclick="earnPoints()" id="pointsModalEarnBtn" style="width:100%;background:linear-gradient(135deg,#f5c518,#e8a000);color:#000;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Watch Ad · Earn 10 Points
+    </button>
+    <div style="font-size:11px;color:rgba(255,255,255,0.25);text-align:center;margin-top:10px" id="pointsCooldownMsg"></div>
+  </div>
+</div>
+<!-- ═══ END POINTS MODAL ═══ -->
 </div><!-- #appRoot -->
 <!-- Poster strip removed — hero now uses full-bleed TMDB backdrop (see hero script above) -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     GIFT POINTS MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="giftPointsModal" style="display:none;position:fixed;inset:0;z-index:100025;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.82);backdrop-filter:blur(10px)">
+  <div style="background:#0f0f13;border:1px solid rgba(232,98,42,.25);border-radius:22px;width:100%;max-width:400px;padding:28px 24px;box-shadow:0 40px 100px rgba(0,0,0,.85);position:relative">
+    <button onclick="closeGiftPointsModal()" style="position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+    <div style="font-size:2.2rem;text-align:center;margin-bottom:10px">🎁</div>
+    <div style="font-family:Outfit,system-ui,sans-serif;font-size:18px;font-weight:800;color:#f0f0f5;text-align:center;letter-spacing:-.02em;margin-bottom:4px">Gift Points</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.35);text-align:center;margin-bottom:20px">Send your points to a friend using their UID</div>
+
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,.4);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:6px">Recipient UID</label>
+      <input id="giftUidInput" type="text" placeholder="Paste their UID here…" maxlength="128"
+        style="width:100%;padding:10px 13px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#f0f0f5;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;box-sizing:border-box;transition:border-color .15s"
+        onfocus="this.style.borderColor='rgba(232,98,42,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"/>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,.4);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:6px">Amount (pts)</label>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button onclick="svGiftSetAmt(10)"  class="gift-amt-btn" style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">10</button>
+        <button onclick="svGiftSetAmt(25)"  class="gift-amt-btn" style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">25</button>
+        <button onclick="svGiftSetAmt(50)"  class="gift-amt-btn" style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">50</button>
+        <button onclick="svGiftSetAmt(100)" class="gift-amt-btn" style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">100</button>
+      </div>
+      <input id="giftAmtInput" type="number" placeholder="Or type a custom amount" min="1" max="10000"
+        style="width:100%;padding:10px 13px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#f0f0f5;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .15s"
+        onfocus="this.style.borderColor='rgba(232,98,42,.5)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'"/>
+    </div>
+
+    <div id="giftPointsError" style="display:none;font-size:12px;color:#f87171;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center"></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span style="font-size:12px;color:rgba(255,255,255,.3)">Your balance</span>
+      <span id="giftMyBalance" style="font-size:13px;font-weight:700;color:#f5c518">⭐ 0 pts</span>
+    </div>
+
+    <button onclick="svSendGift()" id="giftSendBtn"
+      style="width:100%;padding:13px 0;border-radius:12px;border:none;background:linear-gradient(135deg,#e8622a,#f59060);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .15s;letter-spacing:-.01em">
+      Send Gift 🎁
+    </button>
+  </div>
+</div>
+
 </body>
 </html>
