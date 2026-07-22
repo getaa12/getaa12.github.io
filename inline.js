@@ -1743,36 +1743,7 @@ window._svAppReady = function () {
         }
       }
 
-      // FEATURE 5: CAST CARDS
-      if (data.credits && data.credits.cast && data.credits.cast.length > 0) {
-        const castHtml = data.credits.cast
-          .slice(0, 12)
-          .map((c) => {
-            const photo = c.profile_path
-              ? `https://image.tmdb.org/t/p/w185${c.profile_path}`
-              : "";
-            const initials = c.name
-              .split(" ")
-              .map((x) => x[0])
-              .join("")
-              .slice(0, 2);
-            const imgEl = photo
-              ? `<img class="cast-avatar" src="${photo}" alt="${c.name}" onerror="this.style.display='none'">`
-              : `<div class="cast-avatar" style="display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;color:var(--muted);font-size:1.2rem">${initials}</div>`;
-            return `<div class="cast-card" title="${c.name} as ${c.character || ""}">
-          ${imgEl}
-          <div class="cast-name">${c.name}</div>
-          <div class="cast-char">${(c.character || "").slice(0, 20)}</div>
-        </div>`;
-          })
-          .join("");
-        // Insert cast section before similar content
-        const simContainer = document.getElementById("similarContentContainer");
-        const castSection = document.createElement("div");
-        castSection.className = "cast-section";
-        castSection.innerHTML = `<div class="similar-title" style="margin-bottom:12px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Cast</div><div class="cast-scroll">${castHtml}</div>`;
-        simContainer.parentNode.insertBefore(castSection, simContainer);
-      }
+      // FEATURE 5: CAST CARDS — removed (was causing lag from loading many cast photos)
     });
     // Inject extra UI elements after DOM settles
     setTimeout(() => {
