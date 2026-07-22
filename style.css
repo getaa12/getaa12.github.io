@@ -472,6 +472,18 @@
     backdrop-filter:blur(4px);
   }
   .pill.accent{background:var(--accent-glow);border-color:rgba(212,105,58,0.4);color:var(--accent)}
+
+  .rating-badge{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:5px 14px 5px 10px;border-radius:20px;
+    background:linear-gradient(135deg,#3a2c0f,#2a2110);
+    border:1px solid rgba(240,180,60,0.35);
+    font-family:var(--font-display);font-size:14px;font-weight:700;
+    color:#f4c95d;
+    box-shadow:0 0 12px rgba(240,180,60,0.15) inset;
+  }
+  .rating-star{color:#ffce54;font-size:15px;filter:drop-shadow(0 0 4px rgba(255,206,84,.5));}
+  .rating-max{font-size:11px;font-weight:500;color:rgba(244,201,93,0.6);margin-left:1px;}
   
   .detail-crew {
     display:flex;flex-direction:column;gap:6px;margin-bottom:16px;
@@ -1827,16 +1839,21 @@
   .cal-arrow:hover { border-color:var(--accent); color:var(--white); }
 
   /* F13: Social reactions strip */
-  .reactions-row { display:flex; gap:8px; flex-wrap:wrap; padding:12px 30px 0; }
+  .reactions-row {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:14px 30px; margin-top:4px;
+    border-top:1px solid var(--border);
+  }
   .reaction-btn {
-    display:flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    min-width:56px; height:34px; padding:0 14px; border-radius:20px;
     border:1px solid var(--border); background:var(--bg3); cursor:pointer; transition:var(--tr);
-    font-family:var(--font-display); font-size:12px; color:var(--muted);
+    font-family:var(--font-display); font-size:12px; color:var(--muted); line-height:1;
   }
   .reaction-btn:hover { border-color:var(--accent); color:var(--white); }
   .reaction-btn.reacted { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
-  .reaction-icon { font-size:16px; line-height:1; }
-  .reaction-count { font-weight:700; }
+  .reaction-icon { display:flex; align-items:center; font-size:16px; line-height:1; }
+  .reaction-count { font-weight:700; min-width:10px; text-align:left; }
 
   /* F14: Glassmorphism genre insight card */
   .insight-card {

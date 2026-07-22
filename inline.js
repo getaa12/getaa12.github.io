@@ -814,6 +814,41 @@ window._svAppReady = function () {
   /* ── COMMENTS JS ─────────────────────────────────────────── */
   let _commentsUnsubscribe = null;
 
+  // Sample community reviews shown as placeholders until real users
+  // start commenting on a title. Once a real comment is posted, these
+  // disappear automatically (renderComments only uses them when the
+  // real comments list is empty).
+  const SAMPLE_REVIEWERS = [
+    { author: "Jordan M.", badge: "🎬", color: "#e8622a", text: "Really solid watch — the pacing kept me hooked the whole way through. Would recommend to anyone into this genre." },
+    { author: "Priya S.", badge: "🍿", color: "#5b8def", text: "Great performances all around. Didn't expect to enjoy it this much, ended up finishing it in one sitting." },
+    { author: "Alex R.", badge: "⭐", color: "#2ec4b6", text: "Not perfect, but definitely worth the watch. The ending stuck with me for a few days after." },
+    { author: "Sam K.", badge: "🎥", color: "#e0b32c", text: "One of the better ones I've seen this year. Great soundtrack too." },
+    { author: "Taylor B.", badge: "🍿", color: "#c65bd6", text: "Solid from start to finish. A few slow moments but overall really glad I gave it a shot." },
+  ];
+  function _hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+  function getSampleComments(ck) {
+    const h = _hashStr(ck);
+    const count = 2 + (h % 3); // 2–4 sample reviews, consistent per title
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const r = SAMPLE_REVIEWERS[(h + i * 7) % SAMPLE_REVIEWERS.length];
+      out.push({
+        id: "sample_" + i,
+        author: r.author,
+        badge: r.badge,
+        color: r.color,
+        text: r.text,
+        ts: Date.now() - (i + 1) * ((h % 5) + 1) * 86400000,
+        _sample: true,
+      });
+    }
+    return out;
+  }
+
   function getContentKey(item) {
     return (item.type + "_" + item.tmdbId).replace(/[^a-zA-Z0-9_]/g, "_");
   }
@@ -879,14 +914,11 @@ window._svAppReady = function () {
     const list = document.getElementById("commentsList");
     const countEl = document.getElementById("commentsCount");
     if (!list) return;
-    if (countEl) countEl.textContent = comments.length;
-    if (!comments.length) {
-      list.innerHTML =
-        '<div class="comments-empty">🍿 No comments yet. Be the first to share!</div>';
-      return;
-    }
+    const usingSamples = comments.length === 0;
+    const displayComments = usingSamples ? getSampleComments(ck) : comments;
+    if (countEl) countEl.textContent = displayComments.length;
     const myUid = window._svUser && window._svUser.uid;
-    list.innerHTML = comments
+    list.innerHTML = displayComments
       .map((c) => {
         const time = c.ts
           ? new Date(c.ts).toLocaleDateString([], {
@@ -1584,7 +1616,7 @@ window._svAppReady = function () {
           <div class="detail-tagline" id="detailTagline" style="display:none;"></div>
           
           <div class="detail-meta-row">
-            <span class="pill accent">★ ${it.rating}</span>
+            <span class="rating-badge"><span class="rating-star">★</span> ${it.rating}<span class="rating-max">/10</span></span>
             <span class="pill">${it.year}</span>
             <span class="pill">${typeLabel}</span>
             <span class="pill" id="detailRuntime" style="display:none;background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2)"></span>
@@ -1747,21 +1779,12 @@ window._svAppReady = function () {
     });
     // Inject extra UI elements after DOM settles
     setTimeout(() => {
+      // AI Summary panel — removed (was taking up too much space)
       const desc = document.getElementById("detailDesc");
       if (desc && desc.parentNode) {
-        // Remove any existing AI review panel before re-injecting
         const existingReview =
           desc.parentNode.querySelector(".ai-review-panel");
         if (existingReview) existingReview.remove();
-        const review = document.createElement("div");
-        review.className = "ai-review-panel";
-        review.innerHTML = `
-        <div class="ai-review-label">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          AI Summary
-        </div>
-        <div class="ai-review-text">${getAIReview(it)}</div>`;
-        desc.parentNode.insertBefore(review, desc.nextSibling);
       }
       // Reactions row
       const simContainer = document.getElementById("similarContentContainer");
@@ -1784,20 +1807,7 @@ window._svAppReady = function () {
         collBtn.onclick = () => addToCollection(it);
         dynActions.appendChild(collBtn);
       }
-      // Watchtime goal in detail body
-      const heroContent = document.querySelector(".detail-hero-info");
-      if (heroContent && !heroContent.querySelector(".goal-bar-wrap")) {
-        const progress = getGoalProgress();
-        const goalDiv = document.createElement("div");
-        goalDiv.className = "goal-bar-wrap";
-        goalDiv.innerHTML = `
-        <div class="goal-header">
-          <span class="goal-label">Weekly Watchtime Goal (${watchGoalHours}h)</span>
-          <span class="goal-pct">${progress}%</span>
-        </div>
-        <div class="goal-track"><div class="goal-fill" style="width:${progress}%"></div></div>`;
-        heroContent.appendChild(goalDiv);
-      }
+      // Watchtime goal bar — removed (was taking up space on detail page)
     }, 100);
   }
 
