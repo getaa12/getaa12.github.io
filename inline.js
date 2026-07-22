@@ -1108,6 +1108,7 @@ window._svAppReady = function () {
   }
 
   let currentGenre = "All";
+  let activeGenres = new Set();
   function applySortToArray(arr) {
     const a = [...arr];
     if (currentSortMode === "rating")
@@ -1811,13 +1812,6 @@ window._svAppReady = function () {
           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Add to List';
         collBtn.onclick = () => addToCollection(it);
         dynActions.appendChild(collBtn);
-
-        const wpBtn = document.createElement("button");
-        wpBtn.className = "btn btn-ghost";
-        wpBtn.innerHTML =
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Watch Party';
-        wpBtn.onclick = () => openWatchParty();
-        dynActions.appendChild(wpBtn);
       }
       // Watchtime goal in detail body
       const heroContent = document.querySelector(".detail-hero-info");
@@ -2820,15 +2814,30 @@ window._svAppReady = function () {
     filterGenre(currentGenre, null);
   }
 
-  // filterGenre (with mood support)
+  // filterGenre (with mood support, multi-select genres)
   function filterGenre(genre, chip) {
-    currentGenre = genre;
-    if (chip) {
-      document
-        .querySelectorAll(".genre-chip")
-        .forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
+    if (genre === "All") {
+      activeGenres.clear();
+    } else if (chip) {
+      // Toggle this genre in/out of the active set
+      if (activeGenres.has(genre)) activeGenres.delete(genre);
+      else activeGenres.add(genre);
+    } else {
+      // Called programmatically (e.g. year filter change) — keep current selection
     }
+    currentGenre = activeGenres.size ? [...activeGenres].join(",") : "All";
+
+    // Sync chip active states with activeGenres
+    document.querySelectorAll(".genre-chip").forEach((c) => {
+      const g = c.getAttribute("onclick").match(/filterGenre\('([^']+)'/);
+      const chipGenre = g ? g[1] : null;
+      if (chipGenre === "All") {
+        c.classList.toggle("active", activeGenres.size === 0);
+      } else if (chipGenre) {
+        c.classList.toggle("active", activeGenres.has(chipGenre));
+      }
+    });
+
     const yf = document.getElementById("yearFilter").value;
     let base = allContent.filter((i) => {
       if (yf === "2020") return parseInt(i.year) >= 2020;
@@ -2853,16 +2862,13 @@ window._svAppReady = function () {
         (i) => i.type === "tv" || (i.runtime && parseInt(i.runtime) < 90),
       );
 
-    let fm =
-      genre === "All"
-        ? base.filter((i) => i.type === "movie")
-        : base.filter((i) => i.type === "movie" && i.genres.includes(genre));
-    let fs =
-      genre === "All"
-        ? base.filter((i) => i.type === "tv")
-        : base.filter((i) => i.type === "tv" && i.genres.includes(genre));
-    let fa =
-      genre === "All" ? base : base.filter((i) => i.genres.includes(genre));
+    const genreMatch = (i) =>
+      activeGenres.size === 0 ||
+      (i.genres && i.genres.some((g) => activeGenres.has(g)));
+
+    let fm = base.filter((i) => i.type === "movie" && genreMatch(i));
+    let fs = base.filter((i) => i.type === "tv" && genreMatch(i));
+    let fa = base.filter((i) => genreMatch(i));
 
     fm = getUnique(fm);
     fs = getUnique(fs);
@@ -3229,7 +3235,9 @@ window._svAppReady = function () {
   let seeAllLabel = "";
 
   function openSeeAll(section) {
-    const genre = currentGenre;
+    const genreMatch = (i) =>
+      activeGenres.size === 0 ||
+      (i.genres && i.genres.some((g) => activeGenres.has(g)));
     const yf = document.getElementById("yearFilter").value;
     let yearFiltered = allContent.filter((i) => {
       if (yf === "2020") return parseInt(i.year) >= 2020;
@@ -3241,22 +3249,9 @@ window._svAppReady = function () {
       return true;
     });
 
-    let fm =
-      genre === "All"
-        ? yearFiltered.filter((i) => i.type === "movie")
-        : yearFiltered.filter(
-            (i) => i.type === "movie" && i.genres.includes(genre),
-          );
-    let fs =
-      genre === "All"
-        ? yearFiltered.filter((i) => i.type === "tv")
-        : yearFiltered.filter(
-            (i) => i.type === "tv" && i.genres.includes(genre),
-          );
-    let fa =
-      genre === "All"
-        ? yearFiltered
-        : yearFiltered.filter((i) => i.genres.includes(genre));
+    let fm = yearFiltered.filter((i) => i.type === "movie" && genreMatch(i));
+    let fs = yearFiltered.filter((i) => i.type === "tv" && genreMatch(i));
+    let fa = yearFiltered.filter(genreMatch);
 
     fm = getUnique(fm);
     fs = getUnique(fs);
@@ -3835,506 +3830,6 @@ window._svAppReady = function () {
     // Note: real speed control would need postMessage to iframe
   }
 
-  /* ---- WATCH TOGETHER — Timestamp-Sync Embed Share ---- */
-  /*
-  Architecture (no WebRTC, no screen capture):
-  HOST  → opens the normal player (embed iframe) for themselves
-        → on play/pause writes state to Firebase RTDB:
-            watch_parties/{roomId}/state = { tmdbId, type, sourceIdx, season, episode,
-                                              playing, startedAt, pausedAt, ts }
-        → every 15 s re-broadcasts current timestamp (drift correction tick)
-  GUEST → shows a fullscreen modal with its OWN embed iframe pointing at the
-            identical embed URL; a transparent overlay blocks all clicks
-        → listens to Firebase state; on every change reloads the iframe
-            to the correct seek position — silent and automatic
-*/
-
-  // ── State ───────────────────────────────────────────────────────────────────
-  let wtRoomId = null;
-  let wtRole = null; // 'host' | 'guest'
-  let wtItem = null;
-  let wtPaused = true;
-  let wtStartTime = null; // wall-clock ms when play was last pressed (host)
-  let wtPauseOffset = 0; // accumulated seconds before latest play
-  let partyInterval = null;
-  let partySeconds = 0;
-
-  let _wtUnsubscribe = null; // Firebase state listener (guest)
-  let _wtCachedState = null;
-  let _wtSyncInterval = null; // host periodic drift-correction tick
-
-  function wtGenId() {
-    return Math.random().toString(36).slice(2, 8).toUpperCase();
-  }
-
-  // ── Firebase helpers ─────────────────────────────────────────────────────────
-  function _wtDb() {
-    return window._firebaseRTDB.getDatabase();
-  }
-  function _wtRef(path) {
-    return window._firebaseRTDB.ref(_wtDb(), path);
-  }
-  function _wtSet(path, val) {
-    return window._firebaseRTDB
-      .set(_wtRef(path), val)
-      .catch((e) => console.warn("[WT]", e));
-  }
-  function _wtRemove(path) {
-    return window._firebaseRTDB.remove(_wtRef(path)).catch(() => {});
-  }
-  function _wtListen(path, cb) {
-    return window._firebaseRTDB.onValue(_wtRef(path), cb);
-  }
-
-  // ── Compute current playback second (host side) ──────────────────────────────
-  function wtCurrentSec() {
-    if (wtPaused || !wtStartTime) return wtPauseOffset;
-    return wtPauseOffset + (Date.now() - wtStartTime) / 1000;
-  }
-
-  // ── Write full state to Firebase ─────────────────────────────────────────────
-  function wtBroadcast(action) {
-    if (!wtRoomId || wtRole !== "host") return;
-    const src = PLAYER_SOURCES[_currentSourceIdx] || PLAYER_SOURCES[0];
-    _wtSet("watch_parties/" + wtRoomId + "/state", {
-      action: action,
-      tmdbId: wtItem ? wtItem.tmdbId : null,
-      type: wtItem ? wtItem.type : null,
-      title: wtItem ? wtItem.title : null,
-      sourceIdx: _currentSourceIdx,
-      season: currentSeason,
-      episode: currentEpisode,
-      playing: !wtPaused,
-      startedAt: wtPaused ? null : wtStartTime,
-      pausedAt: wtPaused ? wtPauseOffset : null,
-      currentSec: wtCurrentSec(),
-      ts: Date.now(),
-    });
-  }
-
-  // ── HOST: start a session ────────────────────────────────────────────────────
-  async function wtHost() {
-    if (!currentItem) {
-      showToast("Open a movie or series first!");
-      return;
-    }
-
-    wtCleanup();
-    wtRoomId = wtGenId();
-    wtRole = "host";
-    wtItem = currentItem;
-    wtPaused = true;
-    wtStartTime = null;
-    wtPauseOffset = 0;
-
-    await _wtSet("watch_parties/" + wtRoomId, {
-      title: wtItem.title,
-      tmdbId: wtItem.tmdbId,
-      type: wtItem.type,
-      host: (window._svProfile && window._svProfile.name) || "Host",
-      ts: Date.now(),
-    });
-
-    // Open the player for the host just like normal
-    playNow();
-    // Show the guest blocker on host side too (host has their own controls)
-    // No blocker needed — host controls the real player normally
-
-    // Start drift-correction broadcast every 15 s
-    _wtSyncInterval = setInterval(function () {
-      if (wtRoomId && wtRole === "host") wtBroadcast("sync");
-    }, 15000);
-
-    wtShowHUD();
-    closeWatchTogetherModal();
-    showToast("🎬 Session ready! Share the invite link with friends.");
-  }
-
-  // ── HOST: play ───────────────────────────────────────────────────────────────
-  function wtHostPlay() {
-    if (wtRole !== "host") return;
-    wtPaused = false;
-    wtStartTime = Date.now();
-    wtBroadcast("play");
-  }
-
-  // ── HOST: pause ──────────────────────────────────────────────────────────────
-  function wtHostPause() {
-    if (wtRole !== "host") return;
-    wtPauseOffset = wtCurrentSec();
-    wtPaused = true;
-    wtStartTime = null;
-    wtBroadcast("pause");
-  }
-
-  // ── HOST: seek (call after seeking in the player) ───────────────────────────
-  function wtHostSeek() {
-    if (wtRole !== "host") return;
-    wtBroadcast(wtPaused ? "pause" : "play");
-  }
-
-  // ── GUEST: join a room ───────────────────────────────────────────────────────
-  async function wtJoin(roomId) {
-    wtCleanup();
-    wtRoomId = roomId;
-    wtRole = "guest";
-
-    // Show the guest modal immediately with spinner
-    const modal = document.getElementById("wtStreamModal");
-    if (modal) modal.style.display = "flex";
-    const statusEl = document.getElementById("wtStreamStatus");
-    const statusTxt = document.getElementById("wtStreamStatusText");
-    if (statusEl) statusEl.style.display = "flex";
-    if (statusTxt) statusTxt.textContent = "Waiting for host to start…";
-
-    wtShowHUD();
-
-    // Listen to host state
-    _wtUnsubscribe = _wtListen(
-      "watch_parties/" + roomId + "/state",
-      function (snap) {
-        if (!snap.exists()) return;
-        const s = snap.val();
-        _wtCachedState = s;
-        wtGuestApply(s);
-      },
-    );
-  }
-
-  // ── GUEST: apply a state update from Firebase ────────────────────────────────
-  function wtGuestApply(s) {
-    if (!s) return;
-
-    // Update item info
-    if (s.tmdbId && (!wtItem || String(wtItem.tmdbId) !== String(s.tmdbId))) {
-      const found = allContent.find(
-        (i) => String(i.tmdbId) === String(s.tmdbId) && i.type === s.type,
-      );
-      wtItem = found || {
-        title: s.title || "Watch Together",
-        tmdbId: s.tmdbId,
-        type: s.type,
-      };
-      const titleEl = document.getElementById("wtStreamTitle");
-      if (titleEl) titleEl.textContent = wtItem.title || "Watch Together";
-      wtUpdateHUD();
-    }
-
-    if (s.action === "end") {
-      showToast("Host ended the Watch Together session.");
-      wtCleanup();
-      wtHideHUD();
-      const modal = document.getElementById("wtStreamModal");
-      if (modal) modal.style.display = "none";
-      return;
-    }
-
-    // Build the correct embed URL at the right timestamp
-    const srcIdx =
-      typeof s.sourceIdx === "number" &&
-      s.sourceIdx >= 0 &&
-      s.sourceIdx < PLAYER_SOURCES.length
-        ? s.sourceIdx
-        : 0;
-    const src = PLAYER_SOURCES[srcIdx];
-    if (!src || !s.tmdbId) return;
-
-    // Calculate seek position
-    let seekSec = 0;
-    if (s.playing && s.startedAt) {
-      seekSec = (s.currentSec || 0) + (Date.now() - s.ts) / 1000;
-    } else {
-      seekSec = s.currentSec || s.pausedAt || 0;
-    }
-    seekSec = Math.max(0, Math.floor(seekSec));
-
-    // Build URL with seek param
-    function addSeek(url) {
-      if (seekSec < 3) return url;
-      const sep = url.includes("?") ? "&" : "?";
-      return url + sep + "t=" + seekSec + "&start=" + seekSec;
-    }
-
-    const season = s.season || 1;
-    const episode = s.episode || 1;
-    const url =
-      s.type === "movie"
-        ? addSeek(src.movie(s.tmdbId))
-        : addSeek(src.tv(s.tmdbId, season, episode));
-
-    const frameEl = document.getElementById("wtGuestFrame");
-    const modal = document.getElementById("wtStreamModal");
-
-    if (frameEl) {
-      // Only reload if URL meaningfully changed (avoids constant reload on sync ticks
-      // unless drift > 5 s)
-      const existing = frameEl.src || "";
-      const existingBase = existing.split("?")[0];
-      const newBase = url.split("?")[0];
-      const existingT = parseInt(
-        (existing.match(/[?&]t=(\d+)/) || [])[1] || "0",
-        10,
-      );
-      const drift = Math.abs(seekSec - existingT);
-
-      if (
-        existingBase !== newBase ||
-        drift > 5 ||
-        s.action === "play" ||
-        s.action === "pause"
-      ) {
-        frameEl.src = url;
-      }
-    }
-
-    if (modal) modal.style.display = "flex";
-
-    // Hide spinner once we have a URL
-    const statusEl = document.getElementById("wtStreamStatus");
-    if (statusEl && url) statusEl.style.display = "none";
-
-    // Keep HUD updated
-    const subEl = document.getElementById("partySub");
-    if (subEl) subEl.textContent = s.playing ? "Playing live" : "Paused";
-  }
-
-  // ── GUEST: leave ─────────────────────────────────────────────────────────────
-  function wtGuestLeave() {
-    wtCleanup();
-    wtHideHUD();
-    const modal = document.getElementById("wtStreamModal");
-    if (modal) modal.style.display = "none";
-    showToast("Left the Watch Together session.");
-  }
-
-  // ── Cleanup ───────────────────────────────────────────────────────────────────
-  function wtCleanup() {
-    if (_wtUnsubscribe) {
-      try {
-        _wtUnsubscribe();
-      } catch (e) {}
-      _wtUnsubscribe = null;
-    }
-    if (_wtSyncInterval) {
-      clearInterval(_wtSyncInterval);
-      _wtSyncInterval = null;
-    }
-
-    // If host: remove room from Firebase
-    if (wtRoomId && wtRole === "host") {
-      _wtRemove("watch_parties/" + wtRoomId);
-    }
-
-    // Clear guest iframe
-    const frameEl = document.getElementById("wtGuestFrame");
-    if (frameEl) frameEl.src = "";
-
-    wtRoomId = null;
-    wtRole = null;
-    wtItem = null;
-    wtPaused = true;
-    wtStartTime = null;
-    wtPauseOffset = 0;
-    _wtCachedState = null;
-  }
-
-  // ── Room link ─────────────────────────────────────────────────────────────────
-  function wtBuildLink(roomId) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("wtroom", roomId);
-    return url.toString();
-  }
-
-  // ── End session (host) ────────────────────────────────────────────────────────
-  function wtEndSession() {
-    if (wtRole !== "host") return;
-    wtBroadcast("end");
-    setTimeout(function () {
-      wtCleanup();
-      wtHideHUD();
-    }, 300);
-    showToast("Watch Together session ended.");
-  }
-
-  // ── HUD ───────────────────────────────────────────────────────────────────────
-  function wtShowHUD() {
-    const el = document.getElementById("partyTimer");
-    if (el) el.classList.add("visible");
-    wtUpdateHUD();
-  }
-  function wtHideHUD() {
-    const el = document.getElementById("partyTimer");
-    if (el) el.classList.remove("visible");
-  }
-  function wtUpdateHUD() {
-    const titleEl = document.getElementById("partyCountdown");
-    const subEl = document.getElementById("partySub");
-    const actEl = document.getElementById("partyActions");
-    if (!titleEl) return;
-    titleEl.textContent = (wtItem && wtItem.title) || "Watch Together";
-    if (wtRole === "host") {
-      if (subEl) subEl.textContent = "Host \u2022 You control playback";
-      if (actEl)
-        actEl.innerHTML =
-          '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtCopyLink()">&#128279; Copy Link</button>' +
-          '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtHostPlay()">&#9654; Play</button>' +
-          '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtHostPause()">&#9646;&#9646; Pause</button>' +
-          '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;color:var(--accent)" onclick="wtEndSession()">End</button>';
-    } else {
-      if (subEl)
-        subEl.textContent = wtRoomId
-          ? "Watching \u2022 Room: " + wtRoomId
-          : "Connecting\u2026";
-      if (actEl)
-        actEl.innerHTML =
-          '<button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="wtGuestLeave()">Leave</button>';
-    }
-  }
-
-  function closeWatchTogether() {
-    if (wtRole === "host") {
-      if (confirm("End the Watch Together session for everyone?"))
-        wtEndSession();
-    } else {
-      wtGuestLeave();
-    }
-  }
-
-  function wtCopyLink() {
-    const link = wtBuildLink(wtRoomId);
-    if (navigator.clipboard) {
-      navigator.clipboard
-        .writeText(link)
-        .then(() => showToast("Link copied! Share with friends."))
-        .catch(() => prompt("Copy this link:", link));
-    } else {
-      prompt("Copy this link:", link);
-    }
-  }
-
-  function wtLeave() {
-    wtGuestLeave();
-  }
-  function wtApplySync() {}
-  function wtPoll() {}
-  function wtHostSeek() {
-    if (wtRole === "host") wtBroadcast(wtPaused ? "pause" : "play");
-  }
-
-  // ── Watch Together modal UI ──────────────────────────────────────────────────
-  function openWatchTogetherModal() {
-    if (
-      window._requireAuth &&
-      window._requireAuth("Watch Together (Party Mode)")
-    )
-      return;
-    const modal = document.getElementById("watchTogetherModal");
-    const wtc = document.getElementById("wtContent");
-    if (!modal || !wtc) return;
-    modal.classList.add("open");
-
-    const params = new URLSearchParams(window.location.search);
-    const joinRoom = params.get("wtroom");
-
-    if (joinRoom && !wtRoomId) {
-      wtc.innerHTML =
-        '<div style="text-align:center;padding:10px 0 20px"><div style="font-size:2.2rem;margin-bottom:12px">&#127881;</div><div style="font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:6px">You\'ve been invited!</div><div style="color:var(--muted);font-size:13px;margin-bottom:20px">Room <strong style="color:var(--accent);font-family:var(--font-mono)">' +
-        joinRoom +
-        '</strong></div><button class="btn btn-primary" onclick="wtJoin(\'' +
-        joinRoom +
-        "');closeWatchTogetherModal()\">Join Session</button></div>";
-      return;
-    }
-
-    if (wtRoomId) {
-      const link = wtBuildLink(wtRoomId);
-      wtc.innerHTML =
-        '<div style="margin-bottom:14px;font-family:var(--font-display);font-size:.85rem;color:var(--muted)">Active session</div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px"><div style="font-family:var(--font-mono);font-size:.75rem;color:var(--accent);margin-bottom:4px">ROOM ID</div><div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:var(--white);letter-spacing:.1em">' +
-        wtRoomId +
-        '</div></div><div style="margin-bottom:16px"><div style="font-size:12px;color:var(--muted);font-family:var(--font-display);margin-bottom:8px">Share this link:</div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:11px;font-family:var(--font-mono);color:var(--white2);word-break:break-all">' +
-        link +
-        '</div></div><button class="btn btn-primary" style="width:100%;justify-content:center" onclick="wtCopyLink()">&#128279; Copy Invite Link</button>';
-      return;
-    }
-
-    const hasItem = !!currentItem;
-    const itemHtml = hasItem
-      ? '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:20px"><img src="' +
-        IMG +
-        currentItem.poster +
-        '" style="width:40px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0" onerror="this.style.opacity=.3"/><div><div style="font-family:var(--font-display);font-weight:700;font-size:.85rem;color:var(--white)">' +
-        currentItem.title +
-        '</div><div style="font-size:12px;color:var(--muted)">' +
-        currentItem.year +
-        " \u00b7 \u2605" +
-        currentItem.rating +
-        '</div></div></div><button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:10px" onclick="wtHost()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>&#127909; Host a Session</button><div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">Guests load the same video source and stay in sync automatically. No screen sharing needed — works on any device.</div>'
-      : '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:14px;text-align:center;margin-bottom:16px;color:var(--muted);font-family:var(--font-display);font-size:13px">Open a movie or series first, then come back to host.</div>';
-
-    wtc.innerHTML =
-      '<div style="margin-bottom:18px"><p style="color:var(--muted);font-size:13px;line-height:1.6;font-family:var(--font-display)">Everyone loads the same embed — you control play, pause, and timing. Guests follow automatically, no screen sharing required.</p></div>' +
-      itemHtml +
-      '<div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--muted);font-family:var(--font-display)">or join a room</span><div style="flex:1;height:1px;background:var(--border)"></div></div><div style="display:flex;gap:8px"><input id="wtJoinInput" type="text" placeholder="Enter room code" maxlength="6" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key===\'Enter\')wtJoinFromInput()"/><button class="btn btn-ghost" onclick="wtJoinFromInput()">Join</button></div>';
-  }
-
-  function wtJoinFromInput() {
-    const code = (
-      (document.getElementById("wtJoinInput") &&
-        document.getElementById("wtJoinInput").value) ||
-      ""
-    )
-      .trim()
-      .toUpperCase();
-    if (code.length < 4) {
-      showToast("Enter a valid room code");
-      return;
-    }
-    wtJoin(code);
-    closeWatchTogetherModal();
-  }
-
-  function closeWatchTogetherModal() {
-    const m = document.getElementById("watchTogetherModal");
-    if (m) m.classList.remove("open");
-  }
-
-  // Auto-join if URL has ?wtroom=XXXX — wait for app to be ready first
-  (function wtCheckUrl() {
-    const params = new URLSearchParams(window.location.search);
-    const roomCode = params.get("wtroom");
-    if (!roomCode) return;
-    function _tryAutoJoin() {
-      if (typeof allContent !== "undefined" && allContent.length > 0) {
-        wtJoin(roomCode.toUpperCase());
-        try {
-          history.replaceState(null, "", window.location.pathname);
-        } catch (e) {}
-      } else {
-        setTimeout(_tryAutoJoin, 500);
-      }
-    }
-    var _checkReady = setInterval(function () {
-      if (window._svAuthReady) {
-        clearInterval(_checkReady);
-        _tryAutoJoin();
-      }
-    }, 300);
-  })();
-
-  // Legacy stubs
-  function startPartyTimer(s) {
-    openWatchTogetherModal();
-  }
-  function stopPartyTimer() {
-    closeWatchTogether();
-  }
-  function updatePartyDisplay() {}
-
-  function openWatchParty() {
-    if (window._requireAuth && window._requireAuth("Watch Party")) return;
-    openWatchTogetherModal();
-  }
-
   /* ---- F6: SNAP / SCREENSHOT CARD ---- */
   function snapCurrentContent() {
     if (window._requireAuth && window._requireAuth("Saving a snapshot")) return;
@@ -4860,7 +4355,7 @@ window._svAppReady = function () {
     document.body.appendChild(div);
   })();
 
-  /* ---- Inject calendar + watch party + compare buttons in mobile drawer ---- */
+  /* ---- Inject calendar button in mobile drawer ---- */
   (function addMobileFeatureBtns() {
     const actRow = document.querySelector(".mobile-action-row");
     if (!actRow) return;
@@ -5263,18 +4758,6 @@ window._svAppReady = function () {
   window.pinClear = pinClear;
   window.toggleParentalLock = toggleParentalLock;
   window.setPlaybackSpeed = setPlaybackSpeed;
-  window.wtHost = wtHost;
-  window.wtJoin = wtJoin;
-  window.wtGuestLeave = wtGuestLeave;
-  window.wtHostPlay = wtHostPlay;
-  window.wtHostPause = wtHostPause;
-  window.wtEndSession = wtEndSession;
-  window.wtCopyLink = wtCopyLink;
-  window.wtLeave = wtLeave;
-  window.openWatchTogetherModal = openWatchTogetherModal;
-  window.closeWatchTogetherModal = closeWatchTogetherModal;
-  window.wtJoinFromInput = wtJoinFromInput;
-  window.closeWatchTogether = closeWatchTogether;
   window.openSleepTimerModal = openSleepTimerModal;
   window.closeSleepTimerModal = closeSleepTimerModal;
   window.confirmSleepTimer = confirmSleepTimer;

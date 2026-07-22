@@ -183,9 +183,10 @@ window.FirebaseComments = {
 
 // ─── Profile API ─────────────────────────────────────────────────
 window.FirebaseProfile = {
-  async save(profile) {
-    if (!_uid) return;
-    await set(ref(db, `profiles/${_uid}`), profile);
+  async save(profile, uid) {
+    const targetUid = uid || _uid;
+    if (!targetUid) return;
+    await set(ref(db, `profiles/${targetUid}`), profile);
   },
   async load(uid) {
     const snap = await get(ref(db, `profiles/${uid || _uid}`));
@@ -267,8 +268,8 @@ window.FirebaseReactions = {
   },
 };
 
-// ─── Expose RTDB helpers for non-module watch party code ────────────────────
-// The watch party scripts run in regular <script> tags (not ES modules) and
+// ─── Expose RTDB helpers for non-module code ─────────────────────────────────
+// Some scripts run in regular <script> tags (not ES modules) and
 // cannot import from firebase-database.js directly. We bridge the gap here.
 window._firebaseRTDB = { getDatabase, ref, set, get, remove, onValue };
 
@@ -317,7 +318,7 @@ window._fbSignUp = async (email, password, displayName) => {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(cred.user, { displayName });
   const profile = { name: displayName, badge: "🎬", color: "#e8622a", bio: "" };
-  await window.FirebaseProfile.save(profile);
+  await window.FirebaseProfile.save(profile, cred.user.uid);
   return cred.user;
 };
 window._fbSignIn = (email, password) =>
@@ -337,7 +338,7 @@ window._fbGoogleSignIn = async () => {
       color: "#e8622a",
       bio: "",
     };
-    await window.FirebaseProfile.save(profile);
+    await window.FirebaseProfile.save(profile, cred.user.uid);
   }
   return cred.user;
 };

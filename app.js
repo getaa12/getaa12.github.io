@@ -233,7 +233,7 @@ window._requireAuth = function (actionLabel) {
       <div style="font-size:36px;margin-bottom:12px">🔒</div>
       <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:8px">${actionLabel || "Sign in required"}</div>
       <div style="font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6;margin-bottom:22px">
-        Create a free account to unlock watchlists, ratings, roulette, party mode, and more.
+        Create a free account to unlock watchlists, ratings, roulette, and more.
       </div>
       <button onclick="document.getElementById('_guestAuthPrompt').remove();document.getElementById('authScreen').style.display='flex';document.getElementById('guestBanner').style.display='none';"
         style="width:100%;background:#e8622a;color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:inherit">
@@ -278,8 +278,6 @@ window._requireAuth = function (actionLabel) {
     "filterGenre",
     "quickFilter",
     "setActive",
-    "openWatchTogetherModal",
-    "closeWatchTogetherModal",
     "openCalendarModal",
     "closeCalendarModal",
     "toggleCompare",
@@ -315,13 +313,6 @@ window._requireAuth = function (actionLabel) {
     "requestPiP",
     "closeRoulette",
     "roulettePlay",
-    "wtHostPlay",
-    "wtHostPause",
-    "wtLeave",
-    "wtEndSession",
-    "wtCopyLink",
-    "wtJoinFromInput",
-    "closeWatchTogether",
     "closeTrailerOverlay",
     "deleteComment",
     "submitComment",
@@ -377,9 +368,6 @@ window._requireAuth = function (actionLabel) {
     saveProfile: "Saving your profile",
     setWatchGoal: "Setting watch goals",
     snapCurrentContent: "Saving a snapshot",
-    // Social features
-    openWatchTogetherModal: "Watch Together (Party Mode)",
-    openWatchParty: "Watch Party",
     // Roulette
     openRandom: "Movie Roulette",
     roulettePlay: "Movie Roulette",

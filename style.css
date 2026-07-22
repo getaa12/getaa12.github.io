@@ -1738,21 +1738,6 @@
   .speed-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
   .speed-btn:hover { border-color:var(--border2); color:var(--white); }
 
-  /* F5: Watch party countdown timer */
-  #partyTimer {
-    position:fixed; bottom:90px; left:20px; z-index:400;
-    background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius-lg);
-    box-shadow:0 8px 32px rgba(0,0,0,0.6); padding:14px 18px;
-    display:none; min-width:200px;
-  }
-  #partyTimer.visible { display:block; animation:fadeUp .2s ease; }
-  .party-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-  .party-title { font-family:var(--font-display); font-size:.8rem; font-weight:700; color:var(--accent); }
-  .party-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; line-height:1; }
-  .party-countdown { font-family:var(--font-mono); font-size:2.2rem; font-weight:700; color:var(--white); text-align:center; letter-spacing:.05em; }
-  .party-sub { font-size:11px; color:var(--muted); text-align:center; margin-top:4px; font-family:var(--font-display); }
-  .party-actions { display:flex; gap:6px; margin-top:10px; }
-
   /* F6: Screenshot/snapshot card */
   .snap-btn {
     background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius);
