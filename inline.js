@@ -2099,6 +2099,48 @@ window._svAppReady = function () {
   ═══════════════════════════════════════════════════════════════ */
   let _wtSession = null; // active session
 
+  // ── Popup player bridge ──────────────────────────────────────────
+  // openFullPage() opens playback in a separate (noopener) window, which
+  // backgrounds this tab. Without this bridge, document.hidden would
+  // immediately look like "user stopped watching" and kill tracking the
+  // instant the popup gains focus. The popup sends heartbeats (and real
+  // play/pause events when the source supports them) over a
+  // BroadcastChannel so this tab knows watching is still happening.
+  let _popupWatching = false;
+  let _popupHeartbeatTimer = null;
+  const _svWatchChannel =
+    "BroadcastChannel" in window ? new BroadcastChannel("sv_watch") : null;
+
+  function _popupTimedOut() {
+    // No heartbeat for a while — assume the popup was closed.
+    _popupWatching = false;
+    _wtEnd();
+  }
+
+  if (_svWatchChannel) {
+    _svWatchChannel.onmessage = (e) => {
+      const msg = e.data || {};
+      if (msg.type === "heartbeat" || msg.type === "play") {
+        _popupWatching = true;
+        _lbResume();
+        clearTimeout(_popupHeartbeatTimer);
+        _popupHeartbeatTimer = setTimeout(_popupTimedOut, 15000);
+      } else if (msg.type === "pause") {
+        _lbPause();
+      } else if (msg.type === "ended") {
+        clearTimeout(_popupHeartbeatTimer);
+        _popupTimedOut();
+      } else if (msg.type === "timeupdate" && msg.tmdbId) {
+        const k = msg.isTv
+          ? `vk_tv_${msg.tmdbId}_${msg.season}_${msg.ep}`
+          : `vk_movie_${msg.tmdbId}`;
+        try {
+          FirebaseDB.setItem(k, msg.currentTime || 0);
+        } catch (e) {}
+      }
+    };
+  }
+
   function _wtStart(item, season, ep) {
     // End any lingering session first
     _wtEnd();
@@ -2140,7 +2182,7 @@ window._svAppReady = function () {
   // Save on tab close / refresh
   window.addEventListener("beforeunload", _wtEnd);
   window.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") _wtEnd();
+    if (document.visibilityState === "hidden" && !_popupWatching) _wtEnd();
   });
 
   /* Helper: get all watch-time records for a specific tmdbId+type */
@@ -2451,6 +2493,40 @@ window._svAppReady = function () {
   let srcIdx  = ${srcIdx};
   let uiVisible = true;
 
+  // ── Report back to the opener tab so it knows watching is happening ──
+  // (this window is opened with noopener, so BroadcastChannel is the
+  // only way to talk to the main app tab)
+  const CH = ('BroadcastChannel' in window) ? new BroadcastChannel('sv_watch') : null;
+  function notify(type, extra) {
+    if (CH) CH.postMessage(Object.assign({ type: type }, extra || {}));
+  }
+  notify('heartbeat');
+  setInterval(function(){ notify('heartbeat'); }, 5000);
+  window.addEventListener('beforeunload', function(){ notify('ended'); });
+  window.addEventListener('pagehide', function(){ notify('ended'); });
+
+  // Relay real play/pause/progress events from sources that support them
+  // (e.g. VidKing). Sources that don't send these just rely on the
+  // heartbeat above.
+  window.addEventListener('message', function(e) {
+    if (typeof e.data !== 'string') return;
+    try {
+      const p = JSON.parse(e.data);
+      if (p.type !== 'PLAYER_EVENT') return;
+      if (p.event === 'play') notify('play');
+      else if (p.event === 'pause' || p.event === 'ended') notify('pause');
+      else if (p.event === 'timeupdate') {
+        notify('timeupdate', {
+          currentTime: p.currentTime || 0,
+          tmdbId: TMDB_ID,
+          isTv: IS_TV,
+          season: season,
+          ep: ep,
+        });
+      }
+    } catch (e) {}
+  });
+
   function buildUrl(si, s, e) {
     const src = SOURCES[si];
     if (!IS_TV) {
@@ -2533,6 +2609,9 @@ window._svAppReady = function () {
 
     const blob = new Blob([html], { type: "text/html" });
     const blobUrl = URL.createObjectURL(blob);
+    _popupWatching = true;
+    clearTimeout(_popupHeartbeatTimer);
+    _popupHeartbeatTimer = setTimeout(_popupTimedOut, 15000);
     window.open(blobUrl, "_blank", "noopener");
   }
 
@@ -4421,8 +4500,11 @@ window._svAppReady = function () {
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) _lbPause();
-    else _lbResume();
+    if (document.hidden) {
+      if (!_popupWatching) _lbPause();
+    } else {
+      _lbResume();
+    }
   });
   window.addEventListener("beforeunload", _lbWatchEnd);
   window.addEventListener("pagehide", _lbWatchEnd);
