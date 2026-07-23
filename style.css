@@ -638,8 +638,7 @@
   body.theater-mode main,
   body.theater-mode footer,
   body.theater-mode .hero,
-  body.theater-mode #scrollTopBtn,
-  body.theater-mode #miniPlayer { opacity:0 !important; pointer-events:none !important; }
+  body.theater-mode #scrollTopBtn { opacity:0 !important; pointer-events:none !important; }
   body.theater-mode { background:#000 !important; }
   body.theater-mode #playerModal { background:rgba(0,0,0,0.98) !important; }
   body.theater-mode #playerModal .modal { box-shadow:none !important; border-color:transparent !important; }
@@ -917,13 +916,6 @@
     transition: background 0.2s ease;
   }
   
-  /* Glassmorphism effect on mini player */
-  #miniPlayer {
-    background: rgba(22,22,28,0.9);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-  
   /* Better notification panel */
   .notif-panel {
     border-radius: var(--radius-lg);
@@ -1105,33 +1097,6 @@
   /* ===== FEATURE 8: RECOMMENDATIONS SECTION ===== */
   .reco-section { margin-top:2.5rem; }
   .reco-badge { font-size:11px; background:var(--accent-glow); border:1px solid rgba(212,105,58,0.35); color:var(--accent2); border-radius:20px; padding:2px 10px; font-family:var(--font-display); font-weight:600; letter-spacing:.04em; }
-
-  /* ===== FEATURE 9: FLOATING MINI PLAYER ===== */
-  #miniPlayer {
-    position:fixed; bottom:72px; right:20px; z-index:400;
-    background:var(--bg2); border:1px solid var(--border2);
-    border-radius:var(--radius-lg); box-shadow:0 8px 32px rgba(0,0,0,0.6);
-    width:260px; overflow:hidden; display:none;
-    animation:fadeUp .2s ease;
-  }
-  #miniPlayer.visible { display:block; }
-  .mini-player-bar {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:8px 12px; background:var(--bg3); border-bottom:1px solid var(--border);
-  }
-  .mini-player-title { font-size:12px; font-weight:600; font-family:var(--font-display); color:var(--white); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
-  .mini-player-btns { display:flex; gap:6px; flex-shrink:0; }
-  .mini-player-btn {
-    width:24px; height:24px; border-radius:4px; border:none;
-    background:var(--bg4); color:var(--muted); font-size:12px; cursor:pointer;
-    display:flex; align-items:center; justify-content:center; transition:var(--tr);
-  }
-  .mini-player-btn:hover { background:var(--accent); color:#fff; }
-  .mini-player-thumb {
-    width:100%; aspect-ratio:16/9; object-fit:cover;
-    display:block; background:var(--bg3); cursor:pointer;
-  }
-  .mini-player-info { padding:8px 12px; font-size:12px; color:var(--muted); font-family:var(--font-body); }
 
   /* ===== FEATURE 10: ACHIEVEMENTS SYSTEM ===== */
   .ach-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; padding:20px 24px; }
@@ -1650,9 +1615,6 @@
 
     /* Notification panel */
     .notif-panel{right:8px;left:8px;width:auto;top:calc(58px + 54px + 8px)}
-
-    /* Mini player */
-    #miniPlayer{bottom:68px;right:8px;left:8px;width:auto}
 
     /* Stats grid */
     .stats-grid{grid-template-columns:repeat(2,1fr);padding:14px}

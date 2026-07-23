@@ -819,11 +819,36 @@ window._svAppReady = function () {
   // disappear automatically (renderComments only uses them when the
   // real comments list is empty).
   const SAMPLE_REVIEWERS = [
-    { author: "Jordan M.", badge: "🎬", color: "#e8622a", text: "Really solid watch — the pacing kept me hooked the whole way through. Would recommend to anyone into this genre." },
-    { author: "Priya S.", badge: "🍿", color: "#5b8def", text: "Great performances all around. Didn't expect to enjoy it this much, ended up finishing it in one sitting." },
-    { author: "Alex R.", badge: "⭐", color: "#2ec4b6", text: "Not perfect, but definitely worth the watch. The ending stuck with me for a few days after." },
-    { author: "Sam K.", badge: "🎥", color: "#e0b32c", text: "One of the better ones I've seen this year. Great soundtrack too." },
-    { author: "Taylor B.", badge: "🍿", color: "#c65bd6", text: "Solid from start to finish. A few slow moments but overall really glad I gave it a shot." },
+    {
+      author: "Jordan M.",
+      badge: "🎬",
+      color: "#e8622a",
+      text: "Really solid watch — the pacing kept me hooked the whole way through. Would recommend to anyone into this genre.",
+    },
+    {
+      author: "Priya S.",
+      badge: "🍿",
+      color: "#5b8def",
+      text: "Great performances all around. Didn't expect to enjoy it this much, ended up finishing it in one sitting.",
+    },
+    {
+      author: "Alex R.",
+      badge: "⭐",
+      color: "#2ec4b6",
+      text: "Not perfect, but definitely worth the watch. The ending stuck with me for a few days after.",
+    },
+    {
+      author: "Sam K.",
+      badge: "🎥",
+      color: "#e0b32c",
+      text: "One of the better ones I've seen this year. Great soundtrack too.",
+    },
+    {
+      author: "Taylor B.",
+      badge: "🍿",
+      color: "#c65bd6",
+      text: "Solid from start to finish. A few slow moments but overall really glad I gave it a shot.",
+    },
   ];
   function _hashStr(s) {
     let h = 0;
@@ -2086,6 +2111,7 @@ window._svAppReady = function () {
       ep: ep || null,
       startedAt: Date.now(),
     };
+    _lbWatchStart();
   }
 
   function _wtEnd() {
@@ -2107,6 +2133,7 @@ window._svAppReady = function () {
         FirebaseDB.setItem(key, JSON.stringify(record));
       } catch (e) {}
     }
+    _lbWatchEnd();
     _wtSession = null;
   }
 
@@ -2175,7 +2202,6 @@ window._svAppReady = function () {
     if (!checkAndUnlock(movieKey)) return;
     _wtStart(currentItem, null, null);
     saveCW(currentItem, 1, 1);
-    showMiniPlayer(currentItem, "Movie");
     addNotif(`▶ Started watching <strong>${currentItem.title}</strong>`);
     openFullPage();
   }
@@ -2187,7 +2213,6 @@ window._svAppReady = function () {
     currentEpisode = ep;
     _wtStart(currentItem, season, ep);
     saveCW(currentItem, season, ep);
-    showMiniPlayer(currentItem, `S${season} E${ep}`);
     addNotif(
       `▶ Started watching <strong>${currentItem.title}</strong> S${season}E${ep}`,
     );
@@ -3179,31 +3204,6 @@ window._svAppReady = function () {
   }
 
   /* =========================================
-   ===== FEATURE 9: FLOATING MINI PLAYER =====
-========================================== */
-  let miniPlayerItem = null;
-
-  function showMiniPlayer(item, label) {
-    miniPlayerItem = item;
-    const mp = document.getElementById("miniPlayer");
-    document.getElementById("miniPlayerTitle").textContent = item.title;
-    document.getElementById("miniPlayerThumb").src = IMG + item.poster;
-    document.getElementById("miniPlayerInfo").textContent = label;
-    mp.classList.add("visible");
-  }
-
-  function closeMiniPlayer() {
-    document.getElementById("miniPlayer").classList.remove("visible");
-    miniPlayerItem = null;
-  }
-
-  function expandMiniPlayer() {
-    if (!miniPlayerItem) return;
-    closeMiniPlayer();
-    openContent(miniPlayerItem);
-  }
-
-  /* =========================================
    ===== FEATURE 10: ACHIEVEMENTS SYSTEM =====
 ========================================== */
 
@@ -3315,16 +3315,18 @@ window._svAppReady = function () {
     if (typeof e.data !== "string") return;
     try {
       const p = JSON.parse(e.data);
-      if (
-        p.type === "PLAYER_EVENT" &&
-        currentItem &&
-        p.event === "timeupdate"
-      ) {
-        const k =
-          currentItem.type === "tv"
-            ? `vk_tv_${currentItem.tmdbId}_${currentSeason}_${currentEpisode}`
-            : `vk_movie_${currentItem.tmdbId}`;
-        FirebaseDB.setItem(k, p.currentTime || 0);
+      if (p.type === "PLAYER_EVENT" && currentItem) {
+        if (p.event === "timeupdate") {
+          const k =
+            currentItem.type === "tv"
+              ? `vk_tv_${currentItem.tmdbId}_${currentSeason}_${currentEpisode}`
+              : `vk_movie_${currentItem.tmdbId}`;
+          FirebaseDB.setItem(k, p.currentTime || 0);
+        } else if (p.event === "pause" || p.event === "ended") {
+          _lbPause();
+        } else if (p.event === "play") {
+          _lbResume();
+        }
       }
     } catch {}
   });
@@ -3931,11 +3933,6 @@ window._svAppReady = function () {
     const trailerOverlay = document.getElementById("trailerOverlay");
     if (trailerOverlay) trailerOverlay.style.display = "none";
 
-    // Hide mini player
-    const miniPlayer = document.getElementById("miniPlayer");
-    if (miniPlayer) miniPlayer.classList.remove("visible");
-    if (typeof miniPlayerItem !== "undefined") window.miniPlayerItem = null;
-
     // Restore scroll and clean URL
     document.body.style.overflow = "";
     window.history.replaceState(null, "", window.location.pathname);
@@ -4377,7 +4374,7 @@ window._svAppReady = function () {
   let _lbUnlisten = null;
   let _lbTab = "all";
   let _lbAllData = [];
-  let _lbSessionStart = Date.now();
+  let _lbSessionStart = null; // null = not currently watching
   let _lbFlushInterval = null;
 
   function _lbFormatTime(seconds) {
@@ -4388,22 +4385,47 @@ window._svAppReady = function () {
   }
 
   function _lbFlushTime() {
+    if (!_lbSessionStart) return;
     const elapsed = Math.floor((Date.now() - _lbSessionStart) / 1000);
     if (elapsed > 0 && window.FirebaseLeaderboard) {
       window.FirebaseLeaderboard.addTime(elapsed);
-      _lbSessionStart = Date.now();
     }
+    _lbSessionStart = Date.now(); // keep the clock running if still watching
   }
 
-  function _lbStartTracking() {
+  // Called when actual playback starts (hooked into _wtStart)
+  function _lbWatchStart() {
     _lbSessionStart = Date.now();
-    _lbFlushInterval = setInterval(_lbFlushTime, 60000);
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) _lbFlushTime();
-      else _lbSessionStart = Date.now();
-    });
-    window.addEventListener("beforeunload", _lbFlushTime);
+    if (!_lbFlushInterval) _lbFlushInterval = setInterval(_lbFlushTime, 20000);
   }
+
+  // Called when the playback session ends (hooked into _wtEnd)
+  function _lbWatchEnd() {
+    if (!_lbSessionStart) return;
+    _lbFlushTime();
+    _lbSessionStart = null;
+    clearInterval(_lbFlushInterval);
+    _lbFlushInterval = null;
+  }
+
+  // Pause the clock without ending the session — tab hidden, or a real
+  // "pause" event from a source that reports one (e.g. VidKing)
+  function _lbPause() {
+    if (_lbSessionStart) {
+      _lbFlushTime();
+      _lbSessionStart = null;
+    }
+  }
+  function _lbResume() {
+    if (!_lbSessionStart && _wtSession) _lbSessionStart = Date.now();
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) _lbPause();
+    else _lbResume();
+  });
+  window.addEventListener("beforeunload", _lbWatchEnd);
+  window.addEventListener("pagehide", _lbWatchEnd);
 
   function _lbRenderList(data) {
     const myUid = window.FirebaseLeaderboard
@@ -4511,7 +4533,6 @@ window._svAppReady = function () {
     _lbRenderList(filtered.length ? filtered : _lbAllData);
   }
 
-  _lbStartTracking();
   window.openLeaderboard = openLeaderboard;
   window.closeLeaderboard = closeLeaderboard;
   window.switchLbTab = switchLbTab;
@@ -4709,8 +4730,6 @@ window._svAppReady = function () {
   window.switchWlTab = switchWlTab;
   window.removeFromMultiWl = removeFromMultiWl;
   window.moveToWlTab = moveToWlTab;
-  window.closeMiniPlayer = closeMiniPlayer;
-  window.expandMiniPlayer = expandMiniPlayer;
   window.openSeeAll = openSeeAll;
   window.closeSeeAll = closeSeeAll;
   window.quickFilter = quickFilter;
@@ -4771,444 +4790,6 @@ window._svAppReady = function () {
   window.closeAchievements = closeAchievements;
 
   // Close wrapper
-  /* =========================================
-   ===== WEEKLY WATCH CHALLENGE =====
-========================================== */
-
-  // ── Firebase path: challenges/current (written every Monday) ──
-  // Shape: { title, description, genre, type, count, weekId, badge, badgeLabel }
-
-  const WC = {
-    _unsubscribe: null,
-    _challenge: null,
-    _completedThisWeek: [], // keys of items completed this week matching genre/type
-    _awarded: false,
-
-    // Monday-based ISO week key: "2025-W18"
-    weekId() {
-      const d = new Date();
-      const day = d.getDay() || 7; // Mon=1…Sun=7
-      d.setDate(d.getDate() + 1 - day); // move to Monday
-      const jan4 = new Date(d.getFullYear(), 0, 4);
-      const week = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
-      return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
-    },
-
-    // Load current challenge from Firebase and listen for updates
-    init() {
-      const { getDatabase, ref, onValue } = window._firebaseRTDB;
-      const db = getDatabase();
-      const r = ref(db, "challenges/current");
-      this._unsubscribe = onValue(r, (snap) => {
-        if (!snap.exists()) {
-          this._challenge = null;
-          this._renderBanner();
-          return;
-        }
-        this._challenge = snap.val();
-        this._syncProgress();
-        this._renderBanner();
-        this._renderModal();
-      });
-      // Auto-write challenge every Monday (first user on Monday triggers it)
-      this._maybeWriteMonday();
-    },
-
-    // Auto-write: if it's Monday and stored weekId !== current weekId, generate & write
-    async _maybeWriteMonday() {
-      const today = new Date();
-      const isMonday = today.getDay() === 1;
-      if (!isMonday) return;
-      const currentWeekId = this.weekId();
-      const { getDatabase, ref, get, set } = window._firebaseRTDB;
-      const db = getDatabase();
-      const snap = await get(ref(db, "challenges/current"));
-      if (snap.exists() && snap.val().weekId === currentWeekId) return; // already written
-      // Pick a challenge from the rotation
-      const challenges = [
-        {
-          title: "Thrill Seeker",
-          description: "Watch 3 Thrillers this week",
-          genre: "Thriller",
-          type: "any",
-          count: 3,
-          badge: "🔪",
-          badgeLabel: "Thrill Seeker",
-        },
-        {
-          title: "Sci-Fi Explorer",
-          description: "Watch 2 Sci-Fi titles this week",
-          genre: "Sci-Fi",
-          type: "any",
-          count: 2,
-          badge: "🚀",
-          badgeLabel: "Sci-Fi Explorer",
-        },
-        {
-          title: "Horror Night",
-          description: "Watch 2 Horror films this week",
-          genre: "Horror",
-          type: "movie",
-          count: 2,
-          badge: "👻",
-          badgeLabel: "Horror Night Survivor",
-        },
-        {
-          title: "Drama Devotee",
-          description: "Watch 3 Drama titles this week",
-          genre: "Drama",
-          type: "any",
-          count: 3,
-          badge: "🎭",
-          badgeLabel: "Drama Devotee",
-        },
-        {
-          title: "Comedy Club",
-          description: "Watch 3 Comedies this week",
-          genre: "Comedy",
-          type: "any",
-          count: 3,
-          badge: "😂",
-          badgeLabel: "Comedy Club Member",
-        },
-        {
-          title: "Crime Boss",
-          description: "Watch 2 Crime titles this week",
-          genre: "Crime",
-          type: "any",
-          count: 2,
-          badge: "🕵️",
-          badgeLabel: "Crime Boss",
-        },
-        {
-          title: "Action Hero",
-          description: "Watch 3 Action titles this week",
-          genre: "Action",
-          type: "any",
-          count: 3,
-          badge: "💥",
-          badgeLabel: "Action Hero",
-        },
-        {
-          title: "Animation Fan",
-          description: "Watch 2 Animation titles this week",
-          genre: "Animation",
-          type: "any",
-          count: 2,
-          badge: "🎨",
-          badgeLabel: "Animation Fan",
-        },
-      ];
-      // Pick based on week number so it's deterministic for everyone
-      const weekNum = parseInt(currentWeekId.split("W")[1], 10);
-      const pick = challenges[weekNum % challenges.length];
-      pick.weekId = currentWeekId;
-      pick.createdAt = Date.now();
-      await set(ref(db, "challenges/current"), pick);
-    },
-
-    // Compare completed content against the challenge
-    _syncProgress() {
-      if (!this._challenge) return;
-      const { genre, type, weekId, count } = this._challenge;
-      // Load completed items
-      let completed = {};
-      try {
-        completed = JSON.parse(FirebaseDB.getItem("sv_completed") || "{}");
-      } catch {}
-      // Load when each item was completed (stored in sv_completed_ts)
-      let ts = {};
-      try {
-        ts = JSON.parse(FirebaseDB.getItem("sv_completed_ts") || "{}");
-      } catch {}
-
-      // We need to know which items were completed THIS week
-      const weekStart = this._weekStart();
-      const weekEnd = weekStart + 7 * 86400000;
-
-      // Get all content catalogue to check genres
-      const allContent = window._allContent || [];
-      const contentMap = {};
-      allContent.forEach((i) => {
-        contentMap[i.type + "_" + i.tmdbId] = i;
-      });
-
-      this._completedThisWeek = Object.keys(completed).filter((key) => {
-        if (!completed[key]) return false;
-        const completedAt = ts[key] || 0;
-        if (completedAt < weekStart || completedAt > weekEnd) return false;
-        const item = contentMap[key];
-        if (!item) return false;
-        if (type !== "any" && item.type !== type) return false;
-        if (genre && !(item.genres || []).includes(genre)) return false;
-        return true;
-      });
-
-      const done = this._completedThisWeek.length;
-      const goal = count || 3;
-
-      if (done >= goal && weekId === this.weekId()) {
-        this._tryAwardBadge();
-      }
-      return { done, goal };
-    },
-
-    _weekStart() {
-      const d = new Date();
-      const day = d.getDay() || 7;
-      d.setDate(d.getDate() + 1 - day);
-      d.setHours(0, 0, 0, 0);
-      return d.getTime();
-    },
-
-    async _tryAwardBadge() {
-      if (this._awarded) return;
-      const awardedKey = "sv_challenge_awarded_" + this._challenge.weekId;
-      if (FirebaseDB.getItem(awardedKey)) return;
-      this._awarded = true;
-      FirebaseDB.setItem(awardedKey, "1");
-
-      // Write badge to profile
-      const badge = this._challenge.badge || "⭐";
-      const badgeLabel = this._challenge.badgeLabel || "Challenge Winner";
-      const profile = window._svProfile || {};
-      const earned = profile.earnedBadges || [];
-      if (!earned.find((b) => b.weekId === this._challenge.weekId)) {
-        earned.push({
-          badge,
-          label: badgeLabel,
-          weekId: this._challenge.weekId,
-          awardedAt: Date.now(),
-        });
-        profile.earnedBadges = earned;
-        window._svProfile = profile;
-        if (window.FirebaseProfile) await window.FirebaseProfile.save(profile);
-      }
-
-      // Toast + update modal
-      setTimeout(() => {
-        if (typeof showToast === "function")
-          showToast(
-            `🏆 Challenge Complete! Badge earned: ${badge} ${badgeLabel}`,
-          );
-      }, 400);
-      this._renderModal();
-      this._renderBanner();
-    },
-
-    // Render the floating banner on the homepage
-    _renderBanner() {
-      let banner = document.getElementById("weeklyChallengeHomeBanner");
-      if (!banner) return;
-      if (!this._challenge) {
-        banner.style.display = "none";
-        return;
-      }
-      const { done, goal } = this._syncProgress() || {
-        done: 0,
-        goal: this._challenge.count || 3,
-      };
-      const pct = Math.min(100, Math.round((done / goal) * 100));
-      const awardedKey = "sv_challenge_awarded_" + this._challenge.weekId;
-      const isComplete = !!FirebaseDB.getItem(awardedKey);
-
-      // Update dot
-      const dot = document.getElementById("weeklyChallengeDot");
-      if (dot) dot.style.display = !isComplete ? "inline-block" : "none";
-
-      banner.style.display = "";
-      banner.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openWeeklyChallenge()">
-        <span style="font-size:1.5rem">${this._challenge.badge || "⭐"}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px">Weekly Challenge</div>
-          <div style="font-size:13px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this._challenge.description}</div>
-          <div style="margin-top:6px;height:4px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${isComplete ? "#4caf50" : "var(--accent)"};border-radius:999px;transition:width .4s ease"></div>
-          </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">${isComplete ? "✅ Completed! Badge earned" : `${done} / ${goal} completed`}</div>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--muted);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>`;
-    },
-
-    _renderModal() {
-      const body = document.getElementById("weeklyChallengeBody");
-      if (!body) return;
-      if (!this._challenge) {
-        body.innerHTML =
-          '<p style="color:var(--muted);text-align:center;padding:32px 0">No challenge active this week. Check back Monday!</p>';
-        return;
-      }
-
-      const { done, goal } = this._syncProgress() || {
-        done: 0,
-        goal: this._challenge.count || 3,
-      };
-      const pct = Math.min(100, Math.round((done / goal) * 100));
-      const awardedKey = "sv_challenge_awarded_" + this._challenge.weekId;
-      const isComplete = !!FirebaseDB.getItem(awardedKey);
-
-      // Days left in week
-      const now = Date.now();
-      const weekEnd = this._weekStart() + 7 * 86400000;
-      const daysLeft = Math.max(0, Math.ceil((weekEnd - now) / 86400000));
-
-      // Matching completed items
-      const allContent = window._allContent || [];
-      const contentMap = {};
-      allContent.forEach((i) => {
-        contentMap[i.type + "_" + i.tmdbId] = i;
-      });
-      const completedItems = this._completedThisWeek
-        .map((k) => contentMap[k])
-        .filter(Boolean);
-
-      // Earned badges from profile
-      const earnedBadges =
-        (window._svProfile && window._svProfile.earnedBadges) || [];
-
-      body.innerHTML = `
-      <!-- Hero -->
-      <div style="text-align:center;padding:8px 0 20px">
-        <div style="font-size:3.5rem;margin-bottom:8px;filter:drop-shadow(0 0 16px rgba(232,98,42,.5))">${this._challenge.badge || "⭐"}</div>
-        <div style="font-size:1.2rem;font-weight:800;color:var(--fg);margin-bottom:4px">${this._challenge.title}</div>
-        <div style="font-size:14px;color:var(--muted)">${this._challenge.description}</div>
-        ${this._challenge.genre ? `<div style="display:inline-block;margin-top:8px;padding:3px 12px;border-radius:999px;background:rgba(232,98,42,.15);color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.06em">${this._challenge.genre.toUpperCase()}</div>` : ""}
-      </div>
-
-      <!-- Progress ring area -->
-      <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--card);border-radius:14px;margin-bottom:16px">
-        <svg width="72" height="72" viewBox="0 0 72 72">
-          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/>
-          <circle cx="36" cy="36" r="30" fill="none" stroke="${isComplete ? "#4caf50" : "var(--accent)"}" stroke-width="7"
-            stroke-dasharray="${Math.round(2 * Math.PI * 30)}"
-            stroke-dashoffset="${Math.round(2 * Math.PI * 30 * (1 - pct / 100))}"
-            stroke-linecap="round"
-            transform="rotate(-90 36 36)"
-            style="transition:stroke-dashoffset .6s cubic-bezier(.4,0,.2,1)"/>
-          <text x="36" y="40" text-anchor="middle" font-family="Outfit,sans-serif" font-size="14" font-weight="800" fill="${isComplete ? "#4caf50" : "var(--fg)"}">${done}/${goal}</text>
-        </svg>
-        <div style="flex:1">
-          ${
-            isComplete
-              ? `<div style="font-weight:700;color:#4caf50;font-size:15px">🏆 Challenge Complete!</div>
-               <div style="font-size:12px;color:var(--muted);margin-top:2px">Badge awarded: ${this._challenge.badge} ${this._challenge.badgeLabel}</div>`
-              : `<div style="font-weight:700;color:var(--fg);font-size:15px">${goal - done} more to go!</div>
-               <div style="font-size:12px;color:var(--muted);margin-top:2px">${daysLeft} day${daysLeft !== 1 ? "s" : ""} left this week</div>`
-          }
-          <div style="margin-top:10px;height:5px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${isComplete ? "#4caf50" : "linear-gradient(90deg,var(--accent),#f59060)"};border-radius:999px;transition:width .5s ease"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Completed matching items -->
-      ${
-        completedItems.length > 0
-          ? `
-        <div style="margin-bottom:16px">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Counted This Week</div>
-          ${completedItems
-            .map(
-              (item) => `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--card);border-radius:10px;margin-bottom:6px">
-              <span style="font-size:1.1rem">✅</span>
-              <div style="flex:1;font-size:13px;font-weight:600;color:var(--fg)">${item.title}</div>
-              <div style="font-size:11px;color:var(--muted)">${item.type === "tv" ? "Series" : "Movie"}</div>
-            </div>`,
-            )
-            .join("")}
-        </div>`
-          : ""
-      }
-
-      <!-- Tip -->
-      ${
-        !isComplete
-          ? `
-        <div style="padding:12px;background:rgba(232,98,42,.08);border:1px solid rgba(232,98,42,.2);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.6">
-          💡 Mark any <strong style="color:var(--accent)">${this._challenge.genre}</strong> title as ✓ Done in its detail view to count towards this challenge.
-        </div>`
-          : ""
-      }
-
-      <!-- All earned badges -->
-      ${
-        earnedBadges.length > 0
-          ? `
-        <div style="margin-top:20px">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Your Challenge Badges</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${earnedBadges
-              .map(
-                (b) => `
-              <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--card);border-radius:999px;border:1px solid rgba(255,255,255,.07)">
-                <span>${b.badge}</span>
-                <span style="font-size:11px;font-weight:600;color:var(--fg)">${b.label}</span>
-              </div>`,
-              )
-              .join("")}
-          </div>
-        </div>`
-          : ""
-      }
-    `;
-    },
-
-    open() {
-      this._renderModal();
-      const m = document.getElementById("weeklyChallengeModal");
-      if (m) {
-        m.style.display = "flex";
-        setTimeout(() => m.classList.add("open"), 10);
-      }
-    },
-
-    close() {
-      const m = document.getElementById("weeklyChallengeModal");
-      if (m) {
-        m.classList.remove("open");
-        setTimeout(() => (m.style.display = "none"), 200);
-      }
-    },
-
-    // Called whenever user marks something as completed — patch timestamp then re-sync
-    onComplete(key, isAdding) {
-      let ts = {};
-      try {
-        ts = JSON.parse(FirebaseDB.getItem("sv_completed_ts") || "{}");
-      } catch {}
-      if (isAdding) ts[key] = Date.now();
-      else delete ts[key];
-      FirebaseDB.setItem("sv_completed_ts", JSON.stringify(ts));
-      this._syncProgress();
-      this._renderBanner();
-      this._renderModal();
-    },
-  };
-
-  window.openWeeklyChallenge = () => WC.open();
-  window.closeWeeklyChallenge = () => WC.close();
-
-  // Patch toggleCompleted to notify WC
-  const _origToggleCompleted = toggleCompleted;
-  window.toggleCompleted = function () {
-    _origToggleCompleted();
-    if (currentItem) {
-      const key = currentItem.type + "_" + currentItem.tmdbId;
-      const isNowDone = !!JSON.parse(
-        FirebaseDB.getItem("sv_completed") || "{}",
-      )[key];
-      WC.onComplete(key, isNowDone);
-    }
-  };
-
-  // Init WC after short delay so _allContent is populated
-  setTimeout(() => WC.init(), 800);
-
-  /* ── expose for window globals ── */
-  window.WC = WC;
 
   // ═══════════════════════════════════════════════════════════════
   //  RELEASE NOTIFICATIONS — checks TMDB daily for new content
