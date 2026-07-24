@@ -987,22 +987,41 @@ window.setFavMood = function () {};
     return best || PERSONALITIES[0];
   }
 
+  function getMultiWatchlist() {
+    // sv_mwl is the real source of truth (want/watching/done) — the same
+    // key FirebaseDB migrates/trims and the one the profile stats read from.
+    // window.multiWatchlist is only used as a fast-path if inline.js has
+    // exposed it; it is NOT guaranteed to exist on window, so we always
+    // fall back to reading sv_mwl directly rather than stale legacy keys.
+    if (window.multiWatchlist) return window.multiWatchlist;
+    try {
+      const raw = window.FirebaseDB
+        ? window.FirebaseDB.getItem("sv_mwl") || "{}"
+        : localStorage.getItem("sv_mwl") || "{}";
+      const mwl = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return {
+        want: mwl.want || [],
+        watching: mwl.watching || [],
+        done: mwl.done || [],
+      };
+    } catch {
+      return { want: [], watching: [], done: [] };
+    }
+  }
+
   function analyzeWatchData() {
     const catalog = getCatalog();
 
-    // Prefer live in-memory data (same source the profile modal uses)
+    // Prefer live in-memory / sv_mwl data (same source the profile modal
+    // uses) over the legacy sv_completed / sv_watchlist keys, which the
+    // app no longer keeps up to date and which caused the taste card to
+    // show a stale, smaller "watched" count than the profile stats.
+    const mwl = getMultiWatchlist();
     let completed, watchlist, ratings;
 
-    if (window.multiWatchlist) {
-      // multiWatchlist.done = watched items (objects with id/tmdbId)
-      completed = (window.multiWatchlist.done || []).map(
-        (w) => w.id || w.tmdbId || w,
-      );
-      watchlist = [
-        ...(window.multiWatchlist.want || []),
-        ...(window.multiWatchlist.watching || []),
-        ...(window.multiWatchlist.done || []),
-      ];
+    if (mwl.done.length || mwl.want.length || mwl.watching.length) {
+      completed = mwl.done.map((w) => w.id || w.tmdbId || w);
+      watchlist = [...mwl.want, ...mwl.watching, ...mwl.done];
     } else {
       completed = getWatched();
       watchlist = getWatchlistItems();
