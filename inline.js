@@ -2261,33 +2261,13 @@ window._svAppReady = function () {
     openFullPage();
   }
 
-  /* ── PLAYER SOURCES — ordered by least ads first ─────────────── */
+  /* ── PLAYER SOURCES ─────────────────────────────────────────── */
   const PLAYER_SOURCES = [
     {
       id: "vidking",
       label: "VidKing",
       movie: (id) => `https://www.vidking.net/embed/movie/${id}`,
       tv: (id, s, e) => `https://www.vidking.net/embed/tv/${id}/${s}/${e}`,
-    },
-    {
-      id: "embedsu",
-      label: "Embed.su",
-      movie: (id) => `https://embed.su/embed/movie/${id}`,
-      tv: (id, s, e) => `https://embed.su/embed/tv/${id}/${s}/${e}`,
-    },
-    {
-      id: "vidsrcme",
-      label: "VidSrc.me",
-      movie: (id) => `https://vidsrc.me/embed/movie?tmdb=${id}`,
-      tv: (id, s, e) =>
-        `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}`,
-    },
-    {
-      id: "multiembed",
-      label: "MultiEmbed",
-      movie: (id) => `https://multiembed.mov/?video_id=${id}&tmdb=1`,
-      tv: (id, s, e) =>
-        `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
     },
   ];
 
