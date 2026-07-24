@@ -1171,8 +1171,93 @@ window.setFavMood = function () {};
       .join("");
   }
 
+  function buildTasteCardReposts() {
+    const section = document.getElementById("tcRepostsSection");
+    const row = document.getElementById("tcReposts");
+    if (!section || !row) return;
+
+    const posts =
+      typeof _svrLoad === "function" ? _svrLoad().slice(0, 3) : [];
+
+    if (!posts.length) {
+      section.style.display = "none";
+      row.innerHTML = "";
+      return;
+    }
+
+    section.style.display = "";
+    row.innerHTML = "";
+
+    posts.forEach((p) => {
+      const item = document.createElement("div");
+      item.className = "tc-repost-item";
+
+      const posterDiv = document.createElement("div");
+      posterDiv.className = "tc-repost-poster";
+
+      const img = document.createElement("img");
+      img.alt = p.title || "";
+      img.style.display = "none";
+      img.onload = () => {
+        img.style.display = "block";
+        posterDiv.textContent = "";
+        posterDiv.appendChild(img);
+      };
+      img.onerror = () => {
+        posterDiv.textContent = "🎬";
+      };
+
+      if (p.poster) {
+        img.src = "https://image.tmdb.org/t/p/w185" + p.poster;
+        posterDiv.appendChild(img);
+      } else if (p.tmdbId && typeof _svrFetchPoster === "function") {
+        posterDiv.textContent = "🎬";
+        _svrFetchPoster(p.tmdbId, p.type, img, posterDiv);
+        posterDiv.appendChild(img);
+      } else {
+        posterDiv.textContent = "🎬";
+      }
+
+      const titleDiv = document.createElement("div");
+      titleDiv.className = "tc-repost-title";
+      titleDiv.textContent = p.title || "";
+      titleDiv.title = p.title || "";
+
+      item.appendChild(posterDiv);
+      item.appendChild(titleDiv);
+      item.addEventListener("click", () => {
+        if (typeof window._svrOpenItem === "function")
+          window._svrOpenItem(p);
+      });
+      row.appendChild(item);
+    });
+  }
+
+  /* ── Real watch-time, sourced from the leaderboard entry (same
+     numbers shown on the Leaderboard), not a flat estimate ── */
+  async function fetchRealWatchHours() {
+    try {
+      const uid =
+        (window.FirebaseLeaderboard &&
+          window.FirebaseLeaderboard.getCurrentUid()) ||
+        window._svUid ||
+        (window._svUser && window._svUser.uid);
+      const rtdb = window._firebaseRTDB;
+      if (!uid || !rtdb) return null;
+      const db = rtdb.getDatabase();
+      const snap = await rtdb.get(rtdb.ref(db, "leaderboard/" + uid));
+      if (!snap.exists()) return null;
+      const entry = snap.val() || {};
+      const totalSeconds = entry.totalSeconds || 0;
+      return totalSeconds / 3600;
+    } catch (e) {
+      console.warn("[TasteCard] leaderboard fetch failed", e);
+      return null;
+    }
+  }
+
   /* ── main builder ── */
-  window.buildTasteCard = function () {
+  window.buildTasteCard = async function () {
     const data = analyzeWatchData();
     const personality = pickPersonality(data.topGenres);
 
@@ -1204,7 +1289,7 @@ window.setFavMood = function () {};
     const tcW = document.getElementById("tcStatWatched");
     if (tcW) tcW.textContent = data.watchedCount || watchlist_fallback();
     const tcH = document.getElementById("tcStatHours");
-    if (tcH) tcH.textContent = (data.estHours || 0) + "h";
+    if (tcH) tcH.textContent = "…"; // placeholder until real leaderboard data resolves
     const tcR = document.getElementById("tcStatRated");
     if (tcR) tcR.textContent = data.ratedCount;
 
@@ -1223,6 +1308,7 @@ window.setFavMood = function () {};
     buildGenrePills(data.topGenres);
     buildDecadeRow(data.decadeCount);
     buildBadges(data);
+    buildTasteCardReposts();
 
     // Re-trigger card animation
     const card = document.getElementById("tasteCardEl");
@@ -1230,6 +1316,15 @@ window.setFavMood = function () {};
       card.style.animation = "none";
       void card.offsetHeight;
       card.style.animation = "";
+    }
+
+    // Pull the real watched-hours total from the leaderboard entry —
+    // the same source of truth used on the Leaderboard tab — and fall
+    // back to the flat estimate only if the user has no tracked time yet.
+    const realHours = await fetchRealWatchHours();
+    if (tcH) {
+      const hrs = realHours != null ? realHours : data.estHours || 0;
+      tcH.textContent = (hrs >= 10 ? Math.round(hrs) : Math.round(hrs * 10) / 10) + "h";
     }
   };
 
