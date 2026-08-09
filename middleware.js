@@ -58,11 +58,18 @@ export default async function middleware(request) {
 
     const rawTitle = data.title || data.name || "StreamVault";
     const title = `${rawTitle} — StreamVault`;
-    const description = data.overview
+
+    // Prefix with the TMDB rating (e.g. "⭐ 7.8/10 · ") when available
+    const rating =
+      typeof data.vote_average === "number" && data.vote_average > 0
+        ? `⭐ ${data.vote_average.toFixed(1)}/10 · `
+        : "";
+    const overviewText = data.overview
       ? data.overview.length > 200
         ? data.overview.slice(0, 200) + "…"
         : data.overview
       : "Discover and track movies & series on StreamVault.";
+    const description = rating + overviewText;
     // Use the wide landscape backdrop instead of the tall portrait poster —
     // renders much smaller/cleaner in chat link previews (Discord, WhatsApp, etc.)
     const poster = data.backdrop_path
