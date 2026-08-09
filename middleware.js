@@ -63,9 +63,13 @@ export default async function middleware(request) {
         ? data.overview.slice(0, 200) + "…"
         : data.overview
       : "Discover and track movies & series on StreamVault.";
-    const poster = data.poster_path
-      ? `https://image.tmdb.org/t/p/w780${data.poster_path}`
-      : FALLBACK_IMAGE;
+    // Use the wide landscape backdrop instead of the tall portrait poster —
+    // renders much smaller/cleaner in chat link previews (Discord, WhatsApp, etc.)
+    const poster = data.backdrop_path
+      ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}`
+      : data.poster_path
+        ? `https://image.tmdb.org/t/p/w780${data.poster_path}`
+        : FALLBACK_IMAGE;
     const pageUrl = url.toString();
 
     const html = `<!DOCTYPE html>
