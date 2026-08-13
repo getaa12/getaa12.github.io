@@ -5,7 +5,7 @@
 //            Offline fallback splash for navigation.
 // ═══════════════════════════════════════════════════════
 
-const CACHE_NAME = "streamvault-v1";
+const CACHE_NAME = "streamvault-v2";
 
 // Assets to pre-cache on install
 const PRECACHE_URLS = [
