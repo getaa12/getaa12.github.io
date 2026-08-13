@@ -967,24 +967,16 @@
     </div>
 
 
-    <!-- SERVER BAR -->
+   <!-- SERVER BAR -->
     <div class="theater-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
         <span style="font-size:11px;color:var(--muted);font-family:var(--font-display);font-weight:600;white-space:nowrap;">Server:</span>
         <button class="src-btn active" onclick="switchSource(0)" title="VidKing">VidKing</button>
+        <button class="src-btn" onclick="switchSource(1)" title="VidSrc">VidSrc</button>
+        <button class="src-btn" onclick="switchSource(2)" title="VidSrc PRO">VidSrc PRO</button>
+        <button class="src-btn" onclick="switchSource(3)" title="SuperEmbed">SuperEmbed</button>
+        <button class="src-btn" onclick="switchSource(4)" title="AutoEmbed">AutoEmbed</button>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <button onclick="openFullPage()" title="Open in full page" style="font-size:11px;padding:5px 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-          Full Page
-        </button>
-        <button id="lightsBtn" onclick="toggleTheaterMode()" title="Theater mode" style="font-size:11px;padding:5px 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted);cursor:pointer;white-space:nowrap;">💡 Lights Out</button>
-        <button onclick="earnPoints()" id="earnPointsBtn" title="Watch a short ad to earn points" style="font-size:11px;padding:5px 12px;background:linear-gradient(135deg,#f5c518,#e8a000);border:none;border-radius:6px;color:#000;cursor:pointer;white-space:nowrap;font-weight:700;display:flex;align-items:center;gap:5px;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span id="earnPointsBtnLabel">+10 pts</span>
-        </button>
-      </div>
-    </div>
   </div>
 </div>
 

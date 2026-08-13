@@ -2349,12 +2349,40 @@ window._svAppReady = function () {
   }
 
   /* ── PLAYER SOURCES ─────────────────────────────────────────── */
+  /* ── PLAYER SOURCES ─────────────────────────────────────────── */
   const PLAYER_SOURCES = [
     {
       id: "vidking",
       label: "VidKing",
       movie: (id) => `https://www.vidking.net/embed/movie/${id}`,
       tv: (id, s, e) => `https://www.vidking.net/embed/tv/${id}/${s}/${e}`,
+    },
+    {
+      id: "vidsrc",
+      label: "VidSrc",
+      movie: (id) => `https://vidsrc.me/embed/movie?tmdb=${id}`,
+      tv: (id, s, e) =>
+        `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}`,
+    },
+    {
+      id: "vidsrcto",
+      label: "VidSrc PRO",
+      movie: (id) => `https://vidsrc.to/embed/movie/${id}`,
+      tv: (id, s, e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}`,
+    },
+    {
+      id: "superembed",
+      label: "SuperEmbed",
+      movie: (id) =>
+        `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1`,
+      tv: (id, s, e) =>
+        `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
+    },
+    {
+      id: "autoembed",
+      label: "AutoEmbed",
+      movie: (id) => `https://autoembed.co/movie/tmdb/${id}`,
+      tv: (id, s, e) => `https://autoembed.co/tv/tmdb/${id}-${s}-${e}`,
     },
   ];
 
