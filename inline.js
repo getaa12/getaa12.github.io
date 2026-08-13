@@ -3514,29 +3514,47 @@ window._svAppReady = function () {
   // after FirebaseDB.hydrate() completes. The DOMContentLoaded equivalent
   // runs inside that wrapper at the bottom of this script block.
   // Additional DOM setup that doesn't depend on user data:
-  document.addEventListener("DOMContentLoaded", () => {
-    // Hero button
+
+  // Hero button
+  // FIX: this used to live only inside a `DOMContentLoaded` listener. If
+  // anything earlier in this script throws (or this script simply finishes
+  // executing after DOMContentLoaded has already fired — e.g. slow network,
+  // cached/deferred load order), the listener never runs and the button is
+  // left with no click handler at all (btn.onclick stays null forever).
+  // Wrapping it in its own function that's invoked immediately when the DOM
+  // is already ready — and re-attaching defensively if the button is ever
+  // re-rendered — makes this resilient regardless of timing.
+  function attachHeroWatchBtn() {
     const heroBtn = document.getElementById("heroWatchBtn");
-    if (heroBtn)
-      heroBtn.onclick = () => {
-        // Open whatever is actually showing in the hero background.
-        // Tries every source we might have at this point, in order
-        // of reliability, so a slow/failed TMDB fetch never leaves
-        // this button doing nothing.
-        const item =
-          window._svHeroItem ||
-          window._svFeaturedMovie ||
-          (typeof catalogMovies !== "undefined" ? catalogMovies[0] : null) ||
-          (typeof catalogSeries !== "undefined" ? catalogSeries[0] : null);
-        if (item) {
-          openContent(item);
-        } else {
-          console.warn("[heroWatchBtn] No content available yet.");
-          if (typeof showToast === "function") {
-            showToast("Still loading — try again in a moment");
-          }
+    if (!heroBtn || heroBtn._svBound) return;
+    heroBtn._svBound = true;
+    heroBtn.onclick = () => {
+      // Open whatever is actually showing in the hero background.
+      // Tries every source we might have at this point, in order
+      // of reliability, so a slow/failed TMDB fetch never leaves
+      // this button doing nothing.
+      const item =
+        window._svHeroItem ||
+        window._svFeaturedMovie ||
+        (typeof catalogMovies !== "undefined" && catalogMovies.length
+          ? catalogMovies[0]
+          : null) ||
+        (typeof catalogSeries !== "undefined" && catalogSeries.length
+          ? catalogSeries[0]
+          : null);
+      if (item) {
+        openContent(item);
+      } else {
+        console.warn("[heroWatchBtn] No content available yet.");
+        if (typeof showToast === "function") {
+          showToast("Still loading — try again in a moment");
         }
-      };
+      }
+    };
+  }
+
+  function initDomSetup() {
+    attachHeroWatchBtn();
 
     // Library stats
     const libStat = document.getElementById("libStat");
@@ -3551,7 +3569,19 @@ window._svAppReady = function () {
     }
 
     // Deep-link handling moved into _svAppReady (after allContent is populated)
-  });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initDomSetup);
+  } else {
+    // DOMContentLoaded already fired by the time this script ran — set up now.
+    initDomSetup();
+  }
+  // Extra safety net: window "load" fires after everything (images, etc.)
+  // is done, and by then catalogMovies/_svHeroItem are far more likely to
+  // be populated. Re-run attach (it's a no-op if already bound) so a
+  // first-paint race never leaves the button permanently unbound.
+  window.addEventListener("load", attachHeroWatchBtn);
 
   /* =====================================================
    ===== NEW FEATURE 1: THEATER MODE (LIGHTS OUT) =====
