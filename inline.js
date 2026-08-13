@@ -2349,7 +2349,6 @@ window._svAppReady = function () {
   }
 
   /* ── PLAYER SOURCES ─────────────────────────────────────────── */
-  /* ── PLAYER SOURCES ─────────────────────────────────────────── */
   const PLAYER_SOURCES = [
     {
       id: "vidking",
@@ -2360,30 +2359,21 @@ window._svAppReady = function () {
     {
       id: "vidsrc",
       label: "VidSrc",
-      movie: (id) => `https://vidsrc.me/embed/movie?tmdb=${id}`,
-      tv: (id, s, e) =>
-        `https://vidsrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}`,
+      movie: (id) => `https://vidsrc.net/embed/movie?tmdb=${id}`,
+      tv: (id, s, e) => `https://vidsrc.net/embed/tv?tmdb=${id}&season=${s}&episode=${e}`,
     },
     {
-      id: "vidsrcto",
-      label: "VidSrc PRO",
-      movie: (id) => `https://vidsrc.to/embed/movie/${id}`,
-      tv: (id, s, e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}`,
+      id: "vidsrccc",
+      label: "VidSrc CC",
+      movie: (id) => `https://vidsrc.cc/v2/embed/movie/${id}`,
+      tv: (id, s, e) => `https://vidsrc.cc/v2/embed/tv/${id}/${s}/${e}`,
     },
     {
       id: "superembed",
       label: "SuperEmbed",
-      movie: (id) =>
-        `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1`,
-      tv: (id, s, e) =>
-        `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
-    },
-    {
-      id: "autoembed",
-      label: "AutoEmbed",
-      movie: (id) => `https://autoembed.co/movie/tmdb/${id}`,
-      tv: (id, s, e) => `https://autoembed.co/tv/tmdb/${id}-${s}-${e}`,
-    },
+      movie: (id) => `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1`,
+      tv: (id, s, e) => `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
+    }
   ];
 
   let _currentSourceIdx = 0;
