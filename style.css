@@ -762,14 +762,27 @@
   }
   @keyframes newBadgePop { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
 
-  /* ===== CONTINUE WATCHING PROGRESS BAR ===== */
+  /* ===== CONTINUE WATCHING CARD ===== */
+  .cw-poster-wrap { position:relative; }
+  .cw-remove {
+    top:7px; right:7px; width:26px; height:26px; font-size:12px;
+    opacity:0; transition:opacity .15s ease;
+  }
+  .cw-card:hover .cw-remove { opacity:1; }
+  .cw-pct {
+    margin-left:auto; font-size:11px; font-weight:600;
+    color:var(--accent); font-family:var(--font-mono);
+  }
+  /* Thin resume-progress line sits at the poster's bottom edge,
+     not the whole card, so it never collides with the title/meta row */
   .cw-progress-wrap {
     position:absolute; bottom:0; left:0; right:0; z-index:10;
-    height:4px; background:rgba(255,255,255,0.15);
+    height:4px; background:rgba(255,255,255,0.2);
   }
   .cw-progress-fill {
-    height:100%; background:var(--accent);
-    border-radius:0 2px 2px 0; transition:width .3s ease;
+    height:100%; background:linear-gradient(90deg,var(--accent),#f5a623);
+    border-radius:0 3px 3px 0; transition:width .3s ease;
+    box-shadow:0 0 6px rgba(232,98,42,0.6);
   }
 
   /* ===== EPISODE PROGRESS ON CARD (Feature 3) ===== */

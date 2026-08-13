@@ -2038,21 +2038,21 @@ window._svAppReady = function () {
             ? Math.min(95, Math.round((parseFloat(vk) / 7200) * 100))
             : 42;
         }
-        return `<div class="card cw-card" onclick="resumeContent('${item.tmdbId}','${item.type}')" style="position:relative">
-      <img class="card-poster" src="${IMG}${item.poster}" alt="${item.title}" loading="lazy" onerror="this.style.opacity=0.2"/>
-      <div class="card-overlay" style="opacity:1;background:linear-gradient(to top,rgba(0,0,0,.9) 0%,transparent 60%)">
-        <button class="card-play" style="opacity:1;transform:translate(-50%,-50%) scale(1)">▶</button>
-        <div class="card-overlay-title">${item.title}</div>
-        <div class="card-overlay-sub">${label}</div>
+        return `<div class="card cw-card" onclick="resumeContent('${item.tmdbId}','${item.type}')">
+      <div class="cw-poster-wrap">
+        <img class="card-poster" src="${IMG}${item.poster}" alt="${item.title}" loading="lazy" onerror="this.style.opacity=0.2"/>
+        <div class="card-overlay">
+          <button class="card-play">▶</button>
+        </div>
+        <button class="card-wishlist cw-remove" onclick="removeCW('${item.tmdbId}','${item.type}',event)" title="Remove">✕</button>
+        <!-- PROGRESS BAR — sits at the bottom edge of the poster, not the card -->
+        <div class="cw-progress-wrap"><div class="cw-progress-fill" style="width:${pct}%"></div></div>
       </div>
-      <button class="card-wishlist" style="top:7px;left:7px;right:auto;font-size:12px;width:24px;height:24px" onclick="removeCW('${item.tmdbId}','${item.type}',event)" title="Remove">✕</button>
-      <!-- PROGRESS BAR -->
-      <div class="cw-progress-wrap"><div class="cw-progress-fill" style="width:${pct}%"></div></div>
       <div class="card-body">
         <div class="card-title">${item.title}</div>
         <div class="card-meta">
           <span class="card-type ${item.type === "tv" ? "series" : "movie"}">${label}</span>
-          <span style="font-size:11px;color:var(--accent);font-family:var(--font-mono);margin-left:auto">${pct}%</span>
+          <span class="cw-pct">${pct}% watched</span>
         </div>
       </div>
     </div>`;
