@@ -265,15 +265,20 @@ function clearMobileNavSearch() {
     if (!r.ok) return null;
     const d = await r.json();
     return {
+      id: tmdbId,
+      type,
       backdropPath: d.backdrop_path || null,
+      posterPath: d.poster_path || null,
       overview: d.overview || "",
       title: d.title || d.name || "",
       year: (d.release_date || d.first_air_date || "").slice(0, 4),
       rating: d.vote_average ? d.vote_average.toFixed(1) : null,
+      genresArr: (d.genres || []).map((g) => g.name),
       genres: (d.genres || [])
         .slice(0, 2)
         .map((g) => g.name)
         .join(" · "),
+      seasons: d.number_of_seasons || null,
     };
   }
 
@@ -286,12 +291,50 @@ function clearMobileNavSearch() {
     const m = (d.results || []).find((x) => x.backdrop_path);
     if (!m) return null;
     return {
+      id: m.id,
+      type: "movie",
       backdropPath: m.backdrop_path,
+      posterPath: m.poster_path || null,
       overview: m.overview || "",
       title: m.title || "",
       year: (m.release_date || "").slice(0, 4),
       rating: m.vote_average ? m.vote_average.toFixed(1) : null,
+      genresArr: [],
       genres: "",
+      seasons: null,
+    };
+  }
+
+  /* Build (or reuse) a proper catalog-shaped item so the Watch Now
+     button opens exactly what the hero is displaying. Prefers a real
+     catalog entry (by tmdbId+type) since it already has verified
+     fields; falls back to a minimal item built from TMDB data. */
+  function buildHeroItem(info) {
+    if (!info || !info.id) return null;
+    try {
+      const pool =
+        info.type === "tv"
+          ? typeof catalogSeries !== "undefined"
+            ? catalogSeries
+            : []
+          : typeof catalogMovies !== "undefined"
+            ? catalogMovies
+            : [];
+      const match = pool.find(
+        (c) => String(c.tmdbId) === String(info.id) && c.type === info.type,
+      );
+      if (match) return match;
+    } catch (e) {}
+    return {
+      tmdbId: info.id,
+      type: info.type,
+      title: info.title,
+      year: info.year,
+      rating: info.rating,
+      genres: info.genresArr || [],
+      poster: info.posterPath || info.backdropPath,
+      desc: info.overview,
+      seasons: info.seasons || 1,
     };
   }
 
@@ -345,6 +388,7 @@ function clearMobileNavSearch() {
       const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
       if (cached && cached.date === today && cached.backdropPath) {
         applyBackdrop(cached);
+        window._svHeroItem = buildHeroItem(cached);
         return;
       }
     } catch {}
@@ -375,6 +419,7 @@ function clearMobileNavSearch() {
           JSON.stringify({ ...info, date: today }),
         );
         applyBackdrop(info);
+        window._svHeroItem = buildHeroItem(info);
       }
     } catch (e) {
       /* silently fail — hero keeps gradient BG */
@@ -2007,6 +2052,26 @@ window._svAppReady = function () {
     showToast("🗑 Watch History cleared.");
   }
 
+  /* Parse a stored vk_movie_ / vk_tv_ value into {t, d} (elapsed/duration
+     in seconds). Handles the new JSON {t,d} format, the legacy raw-number
+     (elapsed only, no duration) format, and missing/invalid data. */
+  function parseWatchProgress(raw) {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && parsed.d) {
+          return { t: parsed.t || 0, d: parsed.d };
+        }
+      } catch (e) {
+        /* not JSON — legacy plain number stored as string */
+      }
+    }
+    const n = parseFloat(raw);
+    if (!isNaN(n) && n > 0) return { t: n, d: 0 };
+    return null;
+  }
+
   function renderContinueWatching() {
     const section = document.getElementById("sec-continue");
     const grid = document.getElementById("grid-continue");
@@ -2025,18 +2090,32 @@ window._svAppReady = function () {
         if (!found) return "";
         const label =
           item.type === "tv" ? `S${item.season} · E${item.ep}` : "Movie";
-        // Progress simulation: use episode/season as rough proxy; movies get 40–75% range
-        let pct = 45;
-        if (item.type === "tv") {
+        // Real progress: computed from actual player-reported elapsed
+        // time / duration (stored via PLAYER_EVENT timeupdate). Only
+        // falls back to an estimate when no real playback data exists
+        // yet for this title (e.g. it was added to CW without playing).
+        const key =
+          item.type === "tv"
+            ? `vk_tv_${item.tmdbId}_${item.season}_${item.ep}`
+            : `vk_movie_${item.tmdbId}`;
+        const progress = parseWatchProgress(FirebaseDB.getItem(key));
+        let pct;
+        if (progress && progress.d) {
+          // Real elapsed/duration from the player
+          pct = Math.min(99, Math.max(1, Math.round((progress.t / progress.d) * 100)));
+        } else if (progress && progress.t) {
+          // We have elapsed time but no duration yet (older data, or the
+          // source hasn't reported duration). Estimate against a typical
+          // runtime rather than showing a fixed placeholder.
+          const assumedDuration = item.type === "tv" ? 2700 : 6600; // ~45min ep / ~110min movie
+          pct = Math.min(97, Math.max(1, Math.round((progress.t / assumedDuration) * 100)));
+        } else if (item.type === "tv") {
+          // No playback data at all yet — fall back to episode position
           const totalEps = (found.seasons || 1) * 10;
           const watchedEps = (item.season - 1) * 10 + item.ep;
           pct = Math.min(95, Math.round((watchedEps / totalEps) * 100));
         } else {
-          // Use stored video time if available
-          const vk = FirebaseDB.getItem(`vk_movie_${item.tmdbId}`);
-          pct = vk
-            ? Math.min(95, Math.round((parseFloat(vk) / 7200) * 100))
-            : 42;
+          pct = 5;
         }
         return `<div class="card cw-card" onclick="resumeContent('${item.tmdbId}','${item.type}')">
       <div class="cw-poster-wrap">
@@ -2135,7 +2214,9 @@ window._svAppReady = function () {
           ? `vk_tv_${msg.tmdbId}_${msg.season}_${msg.ep}`
           : `vk_movie_${msg.tmdbId}`;
         try {
-          FirebaseDB.setItem(k, msg.currentTime || 0);
+          const t = msg.currentTime || 0;
+          const d = msg.duration || 0;
+          FirebaseDB.setItem(k, d ? JSON.stringify({ t, d }) : t);
         } catch (e) {}
       }
     };
@@ -2498,6 +2579,7 @@ window._svAppReady = function () {
       else if (p.event === 'timeupdate') {
         notify('timeupdate', {
           currentTime: p.currentTime || 0,
+          duration: p.duration || (p.data && p.data.duration) || 0,
           tmdbId: TMDB_ID,
           isTv: IS_TV,
           season: season,
@@ -3380,7 +3462,12 @@ window._svAppReady = function () {
             currentItem.type === "tv"
               ? `vk_tv_${currentItem.tmdbId}_${currentSeason}_${currentEpisode}`
               : `vk_movie_${currentItem.tmdbId}`;
-          FirebaseDB.setItem(k, p.currentTime || 0);
+          // Store real elapsed + total duration when the player reports
+          // them (VidKing sends both) so Continue Watching can show an
+          // accurate percentage instead of an estimate.
+          const t = p.currentTime || 0;
+          const d = p.duration || (p.data && p.data.duration) || 0;
+          FirebaseDB.setItem(k, d ? JSON.stringify({ t, d }) : t);
         } else if (p.event === "pause" || p.event === "ended") {
           _lbPause();
         } else if (p.event === "play") {
@@ -3424,7 +3511,14 @@ window._svAppReady = function () {
   document.addEventListener("DOMContentLoaded", () => {
     // Hero button
     const heroBtn = document.getElementById("heroWatchBtn");
-    if (heroBtn) heroBtn.onclick = () => openContent(catalogMovies[0]);
+    if (heroBtn)
+      heroBtn.onclick = () => {
+        // Open whatever is actually showing in the hero background.
+        // Falls back to the first catalog movie only if the hero
+        // hasn't finished resolving yet.
+        const item = window._svHeroItem || catalogMovies[0];
+        if (item) openContent(item);
+      };
 
     // Library stats
     const libStat = document.getElementById("libStat");
