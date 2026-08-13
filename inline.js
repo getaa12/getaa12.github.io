@@ -2102,13 +2102,19 @@ window._svAppReady = function () {
         let pct;
         if (progress && progress.d) {
           // Real elapsed/duration from the player
-          pct = Math.min(99, Math.max(1, Math.round((progress.t / progress.d) * 100)));
+          pct = Math.min(
+            99,
+            Math.max(1, Math.round((progress.t / progress.d) * 100)),
+          );
         } else if (progress && progress.t) {
           // We have elapsed time but no duration yet (older data, or the
           // source hasn't reported duration). Estimate against a typical
           // runtime rather than showing a fixed placeholder.
           const assumedDuration = item.type === "tv" ? 2700 : 6600; // ~45min ep / ~110min movie
-          pct = Math.min(97, Math.max(1, Math.round((progress.t / assumedDuration) * 100)));
+          pct = Math.min(
+            97,
+            Math.max(1, Math.round((progress.t / assumedDuration) * 100)),
+          );
         } else if (item.type === "tv") {
           // No playback data at all yet — fall back to episode position
           const totalEps = (found.seasons || 1) * 10;
@@ -3514,10 +3520,22 @@ window._svAppReady = function () {
     if (heroBtn)
       heroBtn.onclick = () => {
         // Open whatever is actually showing in the hero background.
-        // Falls back to the first catalog movie only if the hero
-        // hasn't finished resolving yet.
-        const item = window._svHeroItem || catalogMovies[0];
-        if (item) openContent(item);
+        // Tries every source we might have at this point, in order
+        // of reliability, so a slow/failed TMDB fetch never leaves
+        // this button doing nothing.
+        const item =
+          window._svHeroItem ||
+          window._svFeaturedMovie ||
+          (typeof catalogMovies !== "undefined" ? catalogMovies[0] : null) ||
+          (typeof catalogSeries !== "undefined" ? catalogSeries[0] : null);
+        if (item) {
+          openContent(item);
+        } else {
+          console.warn("[heroWatchBtn] No content available yet.");
+          if (typeof showToast === "function") {
+            showToast("Still loading — try again in a moment");
+          }
+        }
       };
 
     // Library stats
